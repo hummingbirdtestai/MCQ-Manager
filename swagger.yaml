@@ -1,0 +1,180 @@
+openapi: 3.0.0
+info:
+  title: MCQ Manager API
+  version: 1.0.0
+  description: API documentation for MCQ Manager
+servers:
+  - url: https://hummingbirdtestai.github.io/MCQ-Manager/  # Optional if hosted via Swagger UI on GitHub Pages
+
+paths:
+  /subjects:
+    post:
+      tags: [Subjects]
+      summary: Create subjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+      responses:
+        '201':
+          description: Subjects created
+
+    get:
+      tags: [Subjects]
+      summary: Get all subjects
+      responses:
+        '200':
+          description: List of subjects
+
+  /subjects/{subjectId}/chapters:
+    post:
+      tags: [Subjects]
+      summary: Add chapters and topics to a subject
+      parameters:
+        - in: path
+          name: subjectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chapters:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      topics:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+      responses:
+        '201':
+          description: Chapters and topics created
+
+  /subjects/{subjectId}/structure:
+    get:
+      tags: [Subjects]
+      summary: Get subject structure (chapters and topics)
+      parameters:
+        - in: path
+          name: subjectId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subject structure
+
+  /topics/{topicId}/uploads:
+    post:
+      tags: [Topics]
+      summary: Upload content for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Content uploaded
+
+    get:
+      tags: [Topics]
+      summary: Get all uploads for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of uploads
+
+  /topics/{topicId}/mcqs:
+    post:
+      tags: [Topics]
+      summary: Upload 10 MCQs for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mcqs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      learning_gap:
+                        type: string
+                      stem:
+                        type: string
+                      options:
+                        type: object
+                        properties:
+                          A: { type: string }
+                          B: { type: string }
+                          C: { type: string }
+                          D: { type: string }
+                          E: { type: string }
+                      correct_answer:
+                        type: string
+                      explanation:
+                        type: string
+      responses:
+        '201':
+          description: MCQs uploaded successfully
+        '400':
+          description: Must upload exactly 10 MCQs
+        '500':
+          description: Server error
+
+    get:
+      tags: [Topics]
+      summary: Get MCQs for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of MCQs for the topic
+        '500':
+          description: Server error
