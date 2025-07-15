@@ -394,7 +394,318 @@ app.get('/topics/:topicId/mcqs', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
+/**
+ * @swagger
+ * /users/register:
+ *   post:
+ *     tags:
+ *       - Users
+ *     summary: Register student
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               photograph_url:
+ *                 type: string
+ *               medical_college:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User registered
+ */
+app.post('/users/register', async (req, res) => {
+  const { phone, email, name, photograph_url, medical_college } = req.body;
+  const { data, error } = await supabase.from('users').insert({
+    phone, email, name, photograph_url, medical_college
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
 
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Get user profile
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User profile
+ */
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+/**
+ * @swagger
+ * /topics/{topicId}/mcqs/start-test:
+ *   post:
+ *     tags:
+ *       - Topics
+ *     summary: Start MCQ test session
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Test session started
+ */
+app.post('/topics/:topicId/mcqs/start-test', async (req, res) => {
+  res.status(200).json({ message: 'Test session started (optional implementation).' });
+});
+
+/**
+ * @swagger
+ * /topics/{topicId}/mcqs/{mcqId}/submit:
+ *   post:
+ *     tags:
+ *       - Topics
+ *     summary: Submit answer for MCQ with scoring
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: mcqId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user_id:
+ *                 type: string
+ *               selected_answer:
+ *                 type: string
+ *                 description: A, B, C, D, E or S (Skipped)
+ *     responses:
+ *       200:
+ *         description: Answer submitted with score
+ */
+app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
+  const { topicId, mcqId } = req.params;
+  const { user_id, selected_answer } = req.body;
+
+  const mcq = await supabase.from('mcqs').select('correct_answer').eq('id', mcqId).single();
+  if (!mcq.data) return res.status(404).json({ error: 'MCQ not found' });
+
+  let score = 0;
+  let is_correct = false;
+  if (selected_answer === mcq.data.correct_answer) {
+    score = 4;
+    is_correct = true;
+  } else if (selected_answer === 'S') {
+    score = 0;
+  } else {
+    score = -1;
+  }
+
+  const existing = await supabase
+    .from('student_mcq_responses')
+    .select('id')
+    .eq('user_id', user_id)
+    .eq('topic_id', topicId)
+    .eq('mcq_id', mcqId)
+    .single();
+
+  if (existing.data) {
+    await supabase
+      .from('student_mcq_responses')
+      .update({ selected_answer, is_correct, score })
+      .eq('id', existing.data.id);
+  } else {
+    await supabase.from('student_mcq_responses').insert({
+      user_id,
+      topic_id: topicId,
+      mcq_id: mcqId,
+      selected_answer,
+      is_correct,
+      score
+    });
+  }
+
+  res.status(200).json({ message: 'Answer submitted', score });
+});
+/**
+ * @swagger
+ * /topics/{topicId}/leaderboard:
+ *   get:
+ *     tags:
+ *       - Topics
+ *     summary: Get leaderboard for a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Leaderboard for the topic
+ */
+app.get('/topics/:topicId/leaderboard', async (req, res) => {
+  const { topicId } = req.params;
+  const { data, error } = await supabase.from('student_mcq_responses').select(`
+    user_id,
+    users (
+      name,
+      photograph_url,
+      medical_college
+    ),
+    score
+  `).eq('topic_id', topicId);
+  if (error) return res.status(500).json({ error: error.message });
+  const leaderboard = {};
+  data.forEach((row) => {
+    if (!leaderboard[row.user_id]) {
+      leaderboard[row.user_id] = {
+        name: row.users.name,
+        photograph_url: row.users.photograph_url,
+        medical_college: row.users.medical_college,
+        total_score: 0
+      };
+    }
+    leaderboard[row.user_id].total_score += row.score;
+  });
+  const sorted = Object.values(leaderboard).sort((a, b) => b.total_score - a.total_score).slice(0, 10);
+  res.json(sorted);
+});
+/**
+ * @swagger
+ * /topics/{topicId}/mcqs/{mcqId}/leaderboard-status:
+ *   get:
+ *     tags:
+ *       - Topics
+ *     summary: Get leaderboard status for user and MCQ in a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: mcqId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: user_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Leaderboard and user status for the specified MCQ
+ */
+app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
+  const { topicId, mcqId } = req.params;
+  const { user_id } = req.query;
+
+  const { data: allResponses, error } = await supabase
+    .from('student_mcq_responses')
+    .select(`
+      user_id,
+      mcq_id,
+      score,
+      selected_answer,
+      is_correct,
+      mcqs(correct_answer),
+      users(name, photograph_url, medical_college)
+    `)
+    .eq('topic_id', topicId);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const mcqOrder = allResponses.map(r => r.mcq_id);
+  const uptoIndex = mcqOrder.indexOf(mcqId);
+  if (uptoIndex === -1) return res.status(404).json({ error: 'MCQ not found in responses' });
+
+  const userScores = {};
+  allResponses.forEach(r => {
+    if (!userScores[r.user_id]) {
+      userScores[r.user_id] = {
+        name: r.users.name,
+        photo: r.users.photograph_url,
+        college: r.users.medical_college,
+        total_score: 0,
+        specific_mcq_score: 0,
+        specific_answer: null,
+        specific_correct_answer: null,
+        specific_correctness: null
+      };
+    }
+    if (mcqOrder.indexOf(r.mcq_id) <= uptoIndex) {
+      userScores[r.user_id].total_score += r.score;
+    }
+    if (r.mcq_id === mcqId) {
+      userScores[r.user_id].specific_mcq_score = r.score;
+      userScores[r.user_id].specific_answer = r.selected_answer;
+      userScores[r.user_id].specific_correct_answer = r.mcqs.correct_answer;
+      userScores[r.user_id].specific_correctness = r.is_correct;
+    }
+  });
+
+  const sorted = Object.entries(userScores)
+    .map(([uid, val]) => ({ user_id: uid, ...val }))
+    .sort((a, b) => b.total_score - a.total_score)
+    .slice(0, 10);
+
+  sorted.forEach((user, idx) => user.rank = idx + 1);
+
+  const specificUser = Object.entries(userScores).find(([uid]) => uid === user_id);
+  let userRank = null;
+  sorted.forEach((u, idx) => {
+    if (u.user_id === user_id) userRank = idx + 1;
+  });
+
+  const userData = specificUser ? {
+    user_id,
+    total_score: specificUser[1].total_score,
+    specific_mcq_score: specificUser[1].specific_mcq_score,
+    specific_answer: specificUser[1].specific_answer,
+    correct_answer: specificUser[1].specific_correct_answer,
+    is_correct: specificUser[1].specific_correctness,
+    rank: userRank ?? null
+  } : null;
+
+  res.json({
+    leaderboard: sorted.map(u => ({
+      name: u.name,
+      total_score: u.total_score,
+      specific_mcq_score: u.specific_mcq_score,
+      rank: u.rank
+    })),
+    user: userData
+  });
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
