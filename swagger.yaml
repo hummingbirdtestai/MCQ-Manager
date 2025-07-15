@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: API documentation for MCQ Manager
 servers:
-  - url: https://hummingbirdtestai.github.io/MCQ-Manager/  # Optional if hosted via Swagger UI on GitHub Pages
+  - url: http://localhost:3000
 
 paths:
   /subjects:
@@ -23,15 +23,13 @@ paths:
                   name:
                     type: string
       responses:
-        '201':
-          description: Subjects created
+        '201': { description: Subjects created }
 
     get:
       tags: [Subjects]
       summary: Get all subjects
       responses:
-        '200':
-          description: List of subjects
+        '200': { description: List of subjects }
 
   /subjects/{subjectId}/chapters:
     post:
@@ -41,8 +39,7 @@ paths:
         - in: path
           name: subjectId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -55,32 +52,27 @@ paths:
                   items:
                     type: object
                     properties:
-                      name:
-                        type: string
+                      name: { type: string }
                       topics:
                         type: array
                         items:
                           type: object
                           properties:
-                            name:
-                              type: string
+                            name: { type: string }
       responses:
-        '201':
-          description: Chapters and topics created
+        '201': { description: Chapters and topics created }
 
   /subjects/{subjectId}/structure:
     get:
       tags: [Subjects]
-      summary: Get subject structure (chapters and topics)
+      summary: Get subject structure
       parameters:
         - in: path
           name: subjectId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
-        '200':
-          description: Subject structure
+        '200': { description: Subject structure }
 
   /topics/{topicId}/uploads:
     post:
@@ -90,8 +82,7 @@ paths:
         - in: path
           name: topicId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -99,11 +90,9 @@ paths:
             schema:
               type: object
               properties:
-                content:
-                  type: string
+                content: { type: string }
       responses:
-        '201':
-          description: Content uploaded
+        '201': { description: Content uploaded }
 
     get:
       tags: [Topics]
@@ -112,11 +101,9 @@ paths:
         - in: path
           name: topicId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
-        '200':
-          description: List of uploads
+        '200': { description: List of uploads }
 
   /topics/{topicId}/mcqs:
     post:
@@ -126,8 +113,7 @@ paths:
         - in: path
           name: topicId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -140,10 +126,8 @@ paths:
                   items:
                     type: object
                     properties:
-                      learning_gap:
-                        type: string
-                      stem:
-                        type: string
+                      learning_gap: { type: string }
+                      stem: { type: string }
                       options:
                         type: object
                         properties:
@@ -152,17 +136,12 @@ paths:
                           C: { type: string }
                           D: { type: string }
                           E: { type: string }
-                      correct_answer:
-                        type: string
-                      explanation:
-                        type: string
+                      correct_answer: { type: string }
+                      explanation: { type: string }
       responses:
-        '201':
-          description: MCQs uploaded successfully
-        '400':
-          description: Must upload exactly 10 MCQs
-        '500':
-          description: Server error
+        '201': { description: MCQs uploaded successfully }
+        '400': { description: Must upload exactly 10 MCQs }
+        '500': { description: Server error }
 
     get:
       tags: [Topics]
@@ -171,10 +150,106 @@ paths:
         - in: path
           name: topicId
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
-        '200':
-          description: List of MCQs for the topic
-        '500':
-          description: Server error
+        '200': { description: List of MCQs }
+
+  /users/register:
+    post:
+      tags: [Users]
+      summary: Register student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                name: { type: string }
+                photograph_url: { type: string }
+                medical_college: { type: string }
+      responses:
+        '201': { description: User registered }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: User profile }
+
+  /topics/{topicId}/mcqs/start-test:
+    post:
+      tags: [Topics]
+      summary: Start MCQ test session
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Test session started }
+
+  /topics/{topicId}/mcqs/{mcqId}/submit:
+    post:
+      tags: [Topics]
+      summary: Submit answer for MCQ with scoring
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: mcqId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: string }
+                selected_answer: { type: string, description: A, B, C, D, E, or S (Skipped) }
+      responses:
+        '200': { description: Answer submitted with score }
+
+  /topics/{topicId}/leaderboard:
+    get:
+      tags: [Topics]
+      summary: Get leaderboard for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Leaderboard for the topic }
+
+  /topics/{topicId}/mcqs/{mcqId}/leaderboard-status:
+    get:
+      tags: [Topics]
+      summary: Get leaderboard status for user and MCQ
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: mcqId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: user_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Leaderboard and user status }
