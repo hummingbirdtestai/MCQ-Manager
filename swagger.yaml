@@ -253,3 +253,42 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: Leaderboard and user status }
+
+  /learning-path:
+    get:
+      tags: [Subjects]
+      summary: Get full learning path (subjects → chapters → topics)
+      responses:
+        '200':
+          description: Full learning path structure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    chapters:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+                          topics:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                name:
+                                  type: string
+
+        
