@@ -706,6 +706,59 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
     user: userData
   });
 });
+
+/**
+ * @swagger
+ * /learning-path:
+ *   get:
+ *     tags:
+ *       - Subjects
+ *     summary: Get full learning path (subjects → chapters → topics)
+ *     responses:
+ *       200:
+ *         description: Full learning path structure
+ */
+app.get('/learning-path', async (req, res) => {
+  try {
+    const { data: subjects, error: subjectError } = await supabase.from('subjects').select('id, name');
+    if (subjectError) throw subjectError;
+
+    const result = await Promise.all(subjects.map(async (subject) => {
+      const { data: chapters, error: chaptersError } = await supabase
+        .from('chapters')
+        .select('id, name')
+        .eq('subject_id', subject.id);
+      if (chaptersError) throw chaptersError;
+
+      const chaptersWithTopics = await Promise.all(chapters.map(async (chapter) => {
+        const { data: topics, error: topicsError } = await supabase
+          .from('topics')
+          .select('id, name')
+          .eq('chapter_id', chapter.id);
+        if (topicsError) throw topicsError;
+
+        return {
+          id: chapter.id,
+          name: chapter.name,
+          topics: topics || [],
+        };
+      }));
+
+      return {
+        id: subject.id,
+        name: subject.name,
+        chapters: chaptersWithTopics,
+      };
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch learning path' });
+  }
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
