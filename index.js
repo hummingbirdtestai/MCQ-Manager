@@ -223,7 +223,24 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  *             type: object
  *             properties:
  *               content:
- *                 type: string
+ *                 type: object
+ *                 properties:
+ *                   steps:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         step:
+ *                           type: integer
+ *                         content:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               sender:
+ *                                 type: string
+ *                               html:
+ *                                 type: string
  *     responses:
  *       201:
  *         description: Content uploaded
@@ -237,7 +254,7 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
   // Try parsing the JSON content to ensure it has the correct structure
   let parsedContent;
   try {
-    parsedContent = JSON.parse(content);
+    parsedContent = content;  // Since the content is already in JSON format, no need to parse again
   } catch (error) {
     return res.status(400).json({ error: 'Invalid JSON format' });
   }
@@ -255,7 +272,7 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
     .from('topic_uploads')
     .insert({
       topic_id: topicId,
-      content: parsedContent, // Store as JSON
+      content: parsedContent, // Store as JSON (parsed)
     })
     .select()
     .single();
