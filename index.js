@@ -758,6 +758,39 @@ app.get('/learning-path', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /topics/{topicId}/uploads:
+ *   delete:
+ *     tags:
+ *       - Topics
+ *     summary: Delete all uploads for a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All uploads deleted for the topic
+ *       404:
+ *         description: Topic not found
+ *       500:
+ *         description: Server error
+ */
+app.delete('/topics/:topicId/uploads', async (req, res) => {
+  const { topicId } = req.params;
+
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+
+  const { error } = await supabase.from('topic_uploads').delete().eq('topic_id', topicId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.status(200).json({ message: 'All uploads deleted for this topic' });
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
