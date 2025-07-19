@@ -208,7 +208,7 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  *   post:
  *     tags:
  *       - Topics
- *     summary: Upload content for a topic
+ *     summary: Upload or merge steps for a topic
  *     parameters:
  *       - in: path
  *         name: topicId
@@ -241,38 +241,56 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  *                                 type: string
  *                               html:
  *                                 type: string
+ *                               buzzword:
+ *                                 type: string
+ *                               highYieldPoint:
+ *                                 type: string
+ *                               clarifyingFact:
+ *                                 type: string
  *     responses:
  *       201:
- *         description: Content uploaded
+ *         description: Content uploaded and merged successfully
  */
+
 app.post('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
   const { content } = req.body;
 
-  if (!content) return res.status(400).json({ error: 'Content is required' });
-
-  // Try parsing the JSON content to ensure it has the correct structure
-  let parsedContent;
-  try {
-    parsedContent = content;  // Since the content is already in JSON format, no need to parse again
-  } catch (error) {
-    return res.status(400).json({ error: 'Invalid JSON format' });
-  }
-
-  // Validate the parsed content structure
-  if (!parsedContent.steps || !Array.isArray(parsedContent.steps) || parsedContent.steps.length === 0) {
-    return res.status(400).json({ error: 'Invalid content structure, steps array is required' });
+  if (!content || !Array.isArray(content.steps)) {
+    return res.status(400).json({ error: 'Content with steps array is required' });
   }
 
   const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
-  // Insert the parsed content as JSON into the topic_uploads table
+  const { data: latestUpload } = await supabase
+    .from('topic_uploads')
+    .select('id, content')
+    .eq('topic_id', topicId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  let mergedSteps = latestUpload?.content?.steps || [];
+
+  content.steps.forEach(newStep => {
+    const existingIndex = mergedSteps.findIndex(step => step.step === newStep.step);
+    if (existingIndex >= 0) {
+      mergedSteps[existingIndex] = newStep;
+    } else {
+      mergedSteps.push(newStep);
+    }
+  });
+
+  mergedSteps.sort((a, b) => a.step - b.step);
+
+  const mergedContent = { steps: mergedSteps };
+
   const { data, error } = await supabase
     .from('topic_uploads')
     .insert({
       topic_id: topicId,
-      content: parsedContent, // Store as JSON (parsed)
+      content: mergedContent,
     })
     .select()
     .single();
@@ -288,7 +306,7 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  *   get:
  *     tags:
  *       - Topics
- *     summary: Get all uploads for a topic
+ *     summary: Get merged steps content for a topic
  *     parameters:
  *       - in: path
  *         name: topicId
@@ -297,30 +315,59 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: List of uploads
+ *         description: Merged steps content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 steps:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       step:
+ *                         type: integer
+ *                       content:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             sender:
+ *                               type: string
+ *                             html:
+ *                               type: string
+ *                             buzzword:
+ *                               type: string
+ *                             highYieldPoint:
+ *                               type: string
+ *                             clarifyingFact:
+ *                               type: string
  */
+
 app.get('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
 
   const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
-  const { data, error } = await supabase
+  const { data: latestUpload, error } = await supabase
     .from('topic_uploads')
     .select('id, content, created_at')
     .eq('topic_id', topicId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
   if (error) return res.status(500).json({ error: error.message });
 
-  // Parse the JSON content and return the structured content by steps
-  const parsedUploads = data.map(upload => ({
-    ...upload,
-    content: upload.content, // JSON content stored in the database
-  }));
+  if (!latestUpload) {
+    return res.status(200).json({ steps: [] });
+  }
 
-  res.json(parsedUploads);
+  res.json(latestUpload.content);
 });
+
 
 
 /**
