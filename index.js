@@ -234,12 +234,29 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
 
   if (!content) return res.status(400).json({ error: 'Content is required' });
 
+  // Try parsing the JSON content to ensure it has the correct structure
+  let parsedContent;
+  try {
+    parsedContent = JSON.parse(content);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid JSON format' });
+  }
+
+  // Validate the parsed content structure
+  if (!parsedContent.steps || !Array.isArray(parsedContent.steps) || parsedContent.steps.length === 0) {
+    return res.status(400).json({ error: 'Invalid content structure, steps array is required' });
+  }
+
   const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
+  // Insert the parsed content as JSON into the topic_uploads table
   const { data, error } = await supabase
     .from('topic_uploads')
-    .insert({ topic_id: topicId, content })
+    .insert({
+      topic_id: topicId,
+      content: parsedContent, // Store as JSON
+    })
     .select()
     .single();
 
@@ -279,8 +296,15 @@ app.get('/topics/:topicId/uploads', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  res.json(data);
+  // Parse the JSON content and return the structured content by steps
+  const parsedUploads = data.map(upload => ({
+    ...upload,
+    content: upload.content, // JSON content stored in the database
+  }));
+
+  res.json(parsedUploads);
 });
+
 
 /**
  * @swagger
