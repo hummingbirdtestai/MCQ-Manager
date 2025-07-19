@@ -89,10 +89,28 @@ paths:
             schema:
               type: object
               properties:
-                content: { type: string }
+                content:
+                  type: object
+                  properties:
+                    steps:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          step:
+                            type: integer
+                          content:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                sender:
+                                  type: string
+                                html:
+                                  type: string
       responses:
-        '201': { description: Content uploaded }
-
+        '201':
+          description: Content uploaded
     get:
       tags: [Topics]
       summary: Get all uploads for a topic
@@ -102,8 +120,39 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200': { description: List of uploads }
-
+        '200':
+          description: List of uploads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    content:
+                      type: object
+                      properties:
+                        steps:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              step:
+                                type: integer
+                              content:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    sender:
+                                      type: string
+                                    html:
+                                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
     delete:
       tags: [Topics]
       summary: Delete all uploads for a topic
@@ -136,18 +185,27 @@ paths:
                   items:
                     type: object
                     properties:
-                      learning_gap: { type: string }
-                      stem: { type: string }
+                      learning_gap:
+                        type: string
+                      stem:
+                        type: string
                       options:
                         type: object
                         properties:
-                          A: { type: string }
-                          B: { type: string }
-                          C: { type: string }
-                          D: { type: string }
-                          E: { type: string }
-                      correct_answer: { type: string }
-                      explanation: { type: string }
+                          A:
+                            type: string
+                          B:
+                            type: string
+                          C:
+                            type: string
+                          D:
+                            type: string
+                          E:
+                            type: string
+                      correct_answer:
+                        type: string
+                      explanation:
+                        type: string
       responses:
         '201': { description: MCQs uploaded successfully }
         '400': { description: Must upload exactly 10 MCQs }
@@ -175,11 +233,16 @@ paths:
             schema:
               type: object
               properties:
-                phone: { type: string }
-                email: { type: string }
-                name: { type: string }
-                photograph_url: { type: string }
-                medical_college: { type: string }
+                phone:
+                  type: string
+                email:
+                  type: string
+                name:
+                  type: string
+                photograph_url:
+                  type: string
+                medical_college:
+                  type: string
       responses:
         '201': { description: User registered }
 
@@ -227,8 +290,11 @@ paths:
             schema:
               type: object
               properties:
-                user_id: { type: string }
-                selected_answer: { type: string, description: A, B, C, D, E, or S (Skipped) }
+                user_id:
+                  type: string
+                selected_answer:
+                  type: string
+                  description: A, B, C, D, E, or S (Skipped)
       responses:
         '200': { description: Answer submitted with score }
 
