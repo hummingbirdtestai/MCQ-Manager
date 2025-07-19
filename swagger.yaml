@@ -24,7 +24,6 @@ paths:
                     type: string
       responses:
         '201': { description: Subjects created }
-
     get:
       tags: [Subjects]
       summary: Get all subjects
@@ -104,6 +103,17 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: List of uploads }
+
+    delete:
+      tags: [Topics]
+      summary: Delete all uploads for a topic
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: All uploads deleted for this topic }
 
   /topics/{topicId}/mcqs:
     post:
@@ -290,5 +300,3 @@ paths:
                                   type: string
                                 name:
                                   type: string
-
-        
