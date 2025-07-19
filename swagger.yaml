@@ -76,7 +76,7 @@ paths:
   /topics/{topicId}/uploads:
     post:
       tags: [Topics]
-      summary: Upload content for a topic
+      summary: Upload or merge steps for a topic
       parameters:
         - in: path
           name: topicId
@@ -108,12 +108,18 @@ paths:
                                   type: string
                                 html:
                                   type: string
+                                buzzword:
+                                  type: string
+                                highYieldPoint:
+                                  type: string
+                                clarifyingFact:
+                                  type: string
       responses:
         '201':
-          description: Content uploaded
+          description: Content uploaded and merged successfully
     get:
       tags: [Topics]
-      summary: Get all uploads for a topic
+      summary: Get merged steps content for a topic
       parameters:
         - in: path
           name: topicId
@@ -121,38 +127,34 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: List of uploads
+          description: Merged steps content
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    content:
+                type: object
+                properties:
+                  steps:
+                    type: array
+                    items:
                       type: object
                       properties:
-                        steps:
+                        step:
+                          type: integer
+                        content:
                           type: array
                           items:
                             type: object
                             properties:
-                              step:
-                                type: integer
-                              content:
-                                type: array
-                                items:
-                                  type: object
-                                  properties:
-                                    sender:
-                                      type: string
-                                    html:
-                                      type: string
-                    created_at:
-                      type: string
-                      format: date-time
+                              sender:
+                                type: string
+                              html:
+                                type: string
+                              buzzword:
+                                type: string
+                              highYieldPoint:
+                                type: string
+                              clarifyingFact:
+                                type: string
     delete:
       tags: [Topics]
       summary: Delete all uploads for a topic
