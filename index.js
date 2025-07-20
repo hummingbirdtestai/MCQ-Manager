@@ -348,18 +348,28 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
 app.get('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
 
-  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
-  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+  // Correct: Don't use .single() here
+  const { data: topic, error: topicError } = await supabase
+    .from('topics')
+    .select('id')
+    .eq('id', topicId)
+    .limit(1);
 
-  const { data: latestUpload, error } = await supabase
+  if (topicError) return res.status(500).json({ error: topicError.message });
+  if (!topic || topic.length === 0) {
+    return res.status(404).json({ error: 'Topic not found' });
+  }
+
+  const { data: uploads, error } = await supabase
     .from('topic_uploads')
     .select('id, content, created_at')
     .eq('topic_id', topicId)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
 
   if (error) return res.status(500).json({ error: error.message });
+
+  const latestUpload = uploads?.[0];
 
   if (!latestUpload) {
     return res.status(200).json({ steps: [] });
