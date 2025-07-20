@@ -357,12 +357,6 @@ app.delete('/topics/:topicId/uploads', async (req, res) => {
   res.status(200).json({ message: 'All uploads deleted for this topic' });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`✅ Swagger docs at http://localhost:${PORT}/api-docs`);
-});
-
 /**
  * @swagger
  * /topics/{topicId}/mcqs:
