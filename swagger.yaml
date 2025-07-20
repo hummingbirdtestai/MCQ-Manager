@@ -61,18 +61,6 @@ paths:
       responses:
         '201': { description: Chapters and topics created }
 
-  /subjects/{subjectId}/structure:
-    get:
-      tags: [Subjects]
-      summary: Get subject structure
-      parameters:
-        - in: path
-          name: subjectId
-          required: true
-          schema: { type: string }
-      responses:
-        '200': { description: Subject structure }
-
   /topics/{topicId}/uploads:
     post:
       tags: [Topics]
