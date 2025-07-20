@@ -206,8 +206,7 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  * @swagger
  * /topics/{topicId}/uploads:
  *   post:
- *     tags:
- *       - Topics
+ *     tags: [Topics]
  *     summary: Upload or merge steps for a topic
  *     parameters:
  *       - in: path
@@ -249,9 +248,8 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  *                                 type: string
  *     responses:
  *       201:
- *         description: Content uploaded and merged successfully
+ *         description: Steps merged and uploaded successfully
  */
-
 app.post('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
   const { content } = req.body;
@@ -263,18 +261,27 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
   const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
-  const { data: latestUpload } = await supabase
+  const { data: allUploads, error: fetchError } = await supabase
     .from('topic_uploads')
-    .select('id, content')
-    .eq('topic_id', topicId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .select('content')
+    .eq('topic_id', topicId);
 
-  let mergedSteps = latestUpload?.content?.steps || [];
+  if (fetchError) return res.status(500).json({ error: fetchError.message });
+
+  let mergedSteps = [];
+  allUploads?.forEach(upload => {
+    upload?.content?.steps?.forEach(step => {
+      const existingIndex = mergedSteps.findIndex(s => s.step === step.step);
+      if (existingIndex >= 0) {
+        mergedSteps[existingIndex] = step;
+      } else {
+        mergedSteps.push(step);
+      }
+    });
+  });
 
   content.steps.forEach(newStep => {
-    const existingIndex = mergedSteps.findIndex(step => step.step === newStep.step);
+    const existingIndex = mergedSteps.findIndex(s => s.step === newStep.step);
     if (existingIndex >= 0) {
       mergedSteps[existingIndex] = newStep;
     } else {
@@ -283,21 +290,16 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
   });
 
   mergedSteps.sort((a, b) => a.step - b.step);
-
   const mergedContent = { steps: mergedSteps };
 
   const { data, error } = await supabase
     .from('topic_uploads')
-    .insert({
-      topic_id: topicId,
-      content: mergedContent,
-    })
+    .insert({ topic_id: topicId, content: mergedContent })
     .select()
     .limit(1)
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.status(201).json(data);
 });
 
@@ -305,9 +307,8 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  * @swagger
  * /topics/{topicId}/uploads:
  *   get:
- *     tags:
- *       - Topics
- *     summary: Get merged steps content for a topic
+ *     tags: [Topics]
+ *     summary: Get merged steps for a topic
  *     parameters:
  *       - in: path
  *         name: topicId
@@ -316,66 +317,50 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Merged steps content
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 steps:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       step:
- *                         type: integer
- *                       content:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             sender:
- *                               type: string
- *                             html:
- *                               type: string
- *                             buzzword:
- *                               type: string
- *                             highYieldPoint:
- *                               type: string
- *                             clarifyingFact:
- *                               type: string
+ *         description: Merged steps returned
  */
 app.get('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
+  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
-  // Correct: Don't use .single() here
-  const { data: topic, error: topicError } = await supabase
-    .from('topics')
-    .select('id')
-    .eq('id', topicId)
-    .limit(1);
-
-  if (topicError) return res.status(500).json({ error: topicError.message });
-  if (!topic || topic.length === 0) {
-    return res.status(404).json({ error: 'Topic not found' });
-  }
-
-  const { data: uploads, error } = await supabase
+  const { data: allUploads, error } = await supabase
     .from('topic_uploads')
-    .select('id, content, created_at')
-    .eq('topic_id', topicId)
-    .order('created_at', { ascending: false })
-    .limit(1);
+    .select('content')
+    .eq('topic_id', topicId);
 
   if (error) return res.status(500).json({ error: error.message });
 
-  const latestUpload = uploads?.[0];
+  let mergedSteps = [];
+  allUploads?.forEach(upload => {
+    upload?.content?.steps?.forEach(step => {
+      const existingIndex = mergedSteps.findIndex(s => s.step === step.step);
+      if (existingIndex >= 0) {
+        mergedSteps[existingIndex] = step;
+      } else {
+        mergedSteps.push(step);
+      }
+    });
+  });
 
-  if (!latestUpload) {
-    return res.status(200).json({ steps: [] });
-  }
+  mergedSteps.sort((a, b) => a.step - b.step);
+  res.status(200).json({ steps: mergedSteps });
+});
 
-  res.json(latestUpload.content);
+app.delete('/topics/:topicId/uploads', async (req, res) => {
+  const { topicId } = req.params;
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+
+  const { error } = await supabase.from('topic_uploads').delete().eq('topic_id', topicId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(200).json({ message: 'All uploads deleted for this topic' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Swagger docs at http://localhost:${PORT}/api-docs`);
 });
 
 /**
