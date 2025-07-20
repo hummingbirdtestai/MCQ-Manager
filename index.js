@@ -260,7 +260,7 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
     return res.status(400).json({ error: 'Content with steps array is required' });
   }
 
-  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
   const { data: latestUpload } = await supabase
@@ -293,6 +293,7 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
       content: mergedContent,
     })
     .select()
+    .limit(1)
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
@@ -344,11 +345,10 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  *                             clarifyingFact:
  *                               type: string
  */
-
 app.get('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
 
-  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
   const { data: latestUpload, error } = await supabase
@@ -367,8 +367,6 @@ app.get('/topics/:topicId/uploads', async (req, res) => {
 
   res.json(latestUpload.content);
 });
-
-
 
 /**
  * @swagger
