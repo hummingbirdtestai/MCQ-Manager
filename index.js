@@ -469,6 +469,7 @@ app.get('/topics/:topicId/mcqs', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
+
 /**
  * @swagger
  * /users/register:
@@ -491,16 +492,24 @@ app.get('/topics/:topicId/mcqs', async (req, res) => {
  *                 type: string
  *               photograph_url:
  *                 type: string
- *               medical_college:
+ *               medical_college_id:
  *                 type: string
+ *                 format: uuid
+ *               year_of_joining:
+ *                 type: integer
  *     responses:
  *       201:
- *         description: User registered
+ *         description: User registered successfully
  */
 app.post('/users/register', async (req, res) => {
-  const { phone, email, name, photograph_url, medical_college } = req.body;
+  const { phone, email, name, photograph_url, medical_college_id, year_of_joining } = req.body;
   const { data, error } = await supabase.from('users').insert({
-    phone, email, name, photograph_url, medical_college
+    phone,
+    email,
+    name,
+    photograph_url,
+    medical_college_id,
+    year_of_joining,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
