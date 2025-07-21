@@ -229,8 +229,11 @@ paths:
                   type: string
                 photograph_url:
                   type: string
-                medical_college:
+                medical_college_id:
                   type: string
+                  format: uuid
+                year_of_joining:
+                  type: integer
       responses:
         '201': { description: User registered }
 
