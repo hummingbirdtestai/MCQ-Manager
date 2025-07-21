@@ -875,6 +875,58 @@ app.delete('/topics/:topicId/uploads', async (req, res) => {
   res.status(200).json({ message: 'All uploads deleted for this topic' });
 });
 
+/**
+ * @swagger
+ * /colleges:
+ *   post:
+ *     tags:
+ *       - Colleges
+ *     summary: Add medical colleges
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                 city:
+ *                   type: string
+ *                 state:
+ *                   type: string
+ *                 ownership:
+ *                   type: string
+ *                   enum: [Government, Private]
+ *     responses:
+ *       201:
+ *         description: Colleges added successfully
+ */
+app.post('/colleges', async (req, res) => {
+  const colleges = req.body;
+  const { data, error } = await supabase.from('colleges').insert(colleges).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+/**
+ * @swagger
+ * /colleges:
+ *   get:
+ *     tags:
+ *       - Colleges
+ *     summary: Get all medical colleges
+ *     responses:
+ *       200:
+ *         description: List of medical colleges
+ */
+app.get('/colleges', async (req, res) => {
+  const { data, error } = await supabase.from('colleges').select('*');
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(200).json(data);
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
