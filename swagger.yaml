@@ -357,3 +357,71 @@ paths:
                                   type: string
                                 name:
                                   type: string
+
+  /colleges:
+    post:
+      tags: [Colleges]
+      summary: Add medical colleges
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  city:
+                    type: string
+                  state:
+                    type: string
+                  ownership:
+                    type: string
+                    enum: [Government, Private]
+      responses:
+        '201':
+          description: Colleges added successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    ownership:
+                      type: string
+    get:
+      tags: [Colleges]
+      summary: Get all medical colleges
+      responses:
+        '200':
+          description: List of medical colleges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    city:
+                      type: string
+                    state:
+                      type: string
+                    ownership:
+                      type: string
