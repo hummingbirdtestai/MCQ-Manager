@@ -1,5 +1,5 @@
-import express from 'express';
-import { client } from '../utils/twilioClient.js';
+const express = require('express');
+const { client } = require('../utils/twilioClient.js');
 
 const router = express.Router();
 
@@ -83,5 +83,4 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-export default router;
-
+module.exports = router;
