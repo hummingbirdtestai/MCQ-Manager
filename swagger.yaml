@@ -6,6 +6,14 @@ info:
 servers:
   - url: https://mcq-manager-production.up.railway.app
 
+tags:
+  - name: Subjects
+  - name: Topics
+  - name: Users
+  - name: Colleges
+  - name: Auth
+    description: Authentication via Twilio OTP
+
 paths:
   /subjects:
     post:
