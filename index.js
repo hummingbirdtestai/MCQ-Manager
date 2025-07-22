@@ -706,6 +706,82 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
     user: userData
   });
 });
+
+const twilio = require('twilio');
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+/**
+ * @swagger
+ * /auth/otp/send:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: Send OTP via Twilio SMS
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ */
+app.post('/auth/otp/send', async (req, res) => {
+  const { phone } = req.body;
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  try {
+    await twilioClient.messages.create({
+      body: `Your verification code is ${otp}`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phone
+    });
+    // For demo: In production, store this OTP securely in DB / Redis for verification
+    console.log(`OTP sent to ${phone}: ${otp}`);
+    res.json({ message: 'OTP sent successfully', otp }); // Expose OTP only in dev/test
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+/**
+ * @swagger
+ * /auth/otp/verify:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: Verify OTP (mocked, you implement your logic)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *               otp:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP verified successfully
+ */
+app.post('/auth/otp/verify', async (req, res) => {
+  const { phone, otp } = req.body;
+  // For real: compare from DB / Redis. For now, accept anything.
+  console.log(`Verifying OTP ${otp} for phone ${phone}`);
+  res.json({ message: 'OTP verified successfully (mocked)' });
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
