@@ -32,7 +32,7 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-import authRouter from './routes/auth.js';
+const authRouter = require('./routes/auth.js'); ✅
 app.use('/api/auth', authRouter);
 
 /**
