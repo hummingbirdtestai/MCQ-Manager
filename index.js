@@ -206,9 +206,8 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  * @swagger
  * /topics/{topicId}/uploads:
  *   post:
- *     tags:
- *       - Topics
- *     summary: Upload content for a topic
+ *     tags: [Topics]
+ *     summary: Upload or merge steps for a topic
  *     parameters:
  *       - in: path
  *         name: topicId
@@ -223,28 +222,84 @@ app.get('/subjects/:subjectId/structure', async (req, res) => {
  *             type: object
  *             properties:
  *               content:
- *                 type: string
+ *                 type: object
+ *                 properties:
+ *                   steps:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         step:
+ *                           type: integer
+ *                         content:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               sender:
+ *                                 type: string
+ *                               html:
+ *                                 type: string
+ *                               buzzword:
+ *                                 type: string
+ *                               highYieldPoint:
+ *                                 type: string
+ *                               clarifyingFact:
+ *                                 type: string
  *     responses:
  *       201:
- *         description: Content uploaded
+ *         description: Steps merged and uploaded successfully
  */
 app.post('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
   const { content } = req.body;
 
-  if (!content) return res.status(400).json({ error: 'Content is required' });
+  if (!content || !Array.isArray(content.steps)) {
+    return res.status(400).json({ error: 'Content with steps array is required' });
+  }
 
-  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+
+  const { data: allUploads, error: fetchError } = await supabase
+    .from('topic_uploads')
+    .select('content')
+    .eq('topic_id', topicId);
+
+  if (fetchError) return res.status(500).json({ error: fetchError.message });
+
+  let mergedSteps = [];
+  allUploads?.forEach(upload => {
+    upload?.content?.steps?.forEach(step => {
+      const existingIndex = mergedSteps.findIndex(s => s.step === step.step);
+      if (existingIndex >= 0) {
+        mergedSteps[existingIndex] = step;
+      } else {
+        mergedSteps.push(step);
+      }
+    });
+  });
+
+  content.steps.forEach(newStep => {
+    const existingIndex = mergedSteps.findIndex(s => s.step === newStep.step);
+    if (existingIndex >= 0) {
+      mergedSteps[existingIndex] = newStep;
+    } else {
+      mergedSteps.push(newStep);
+    }
+  });
+
+  mergedSteps.sort((a, b) => a.step - b.step);
+  const mergedContent = { steps: mergedSteps };
 
   const { data, error } = await supabase
     .from('topic_uploads')
-    .insert({ topic_id: topicId, content })
+    .insert({ topic_id: topicId, content: mergedContent })
     .select()
+    .limit(1)
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
-
   res.status(201).json(data);
 });
 
@@ -252,9 +307,8 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  * @swagger
  * /topics/{topicId}/uploads:
  *   get:
- *     tags:
- *       - Topics
- *     summary: Get all uploads for a topic
+ *     tags: [Topics]
+ *     summary: Get merged steps for a topic
  *     parameters:
  *       - in: path
  *         name: topicId
@@ -263,23 +317,44 @@ app.post('/topics/:topicId/uploads', async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: List of uploads
+ *         description: Merged steps returned
  */
 app.get('/topics/:topicId/uploads', async (req, res) => {
   const { topicId } = req.params;
-
-  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).limit(1).single();
   if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
 
-  const { data, error } = await supabase
+  const { data: allUploads, error } = await supabase
     .from('topic_uploads')
-    .select('id, content, created_at')
-    .eq('topic_id', topicId)
-    .order('created_at', { ascending: true });
+    .select('content')
+    .eq('topic_id', topicId);
 
   if (error) return res.status(500).json({ error: error.message });
 
-  res.json(data);
+  let mergedSteps = [];
+  allUploads?.forEach(upload => {
+    upload?.content?.steps?.forEach(step => {
+      const existingIndex = mergedSteps.findIndex(s => s.step === step.step);
+      if (existingIndex >= 0) {
+        mergedSteps[existingIndex] = step;
+      } else {
+        mergedSteps.push(step);
+      }
+    });
+  });
+
+  mergedSteps.sort((a, b) => a.step - b.step);
+  res.status(200).json({ steps: mergedSteps });
+});
+
+app.delete('/topics/:topicId/uploads', async (req, res) => {
+  const { topicId } = req.params;
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+
+  const { error } = await supabase.from('topic_uploads').delete().eq('topic_id', topicId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(200).json({ message: 'All uploads deleted for this topic' });
 });
 
 /**
@@ -394,6 +469,7 @@ app.get('/topics/:topicId/mcqs', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
+
 /**
  * @swagger
  * /users/register:
@@ -416,16 +492,24 @@ app.get('/topics/:topicId/mcqs', async (req, res) => {
  *                 type: string
  *               photograph_url:
  *                 type: string
- *               medical_college:
+ *               medical_college_id:
  *                 type: string
+ *                 format: uuid
+ *               year_of_joining:
+ *                 type: integer
  *     responses:
  *       201:
- *         description: User registered
+ *         description: User registered successfully
  */
 app.post('/users/register', async (req, res) => {
-  const { phone, email, name, photograph_url, medical_college } = req.body;
+  const { phone, email, name, photograph_url, medical_college_id, year_of_joining } = req.body;
   const { data, error } = await supabase.from('users').insert({
-    phone, email, name, photograph_url, medical_college
+    phone,
+    email,
+    name,
+    photograph_url,
+    medical_college_id,
+    year_of_joining,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
@@ -707,80 +791,142 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
   });
 });
 
-const twilio = require('twilio');
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-
 /**
  * @swagger
- * /auth/otp/send:
- *   post:
+ * /learning-path:
+ *   get:
  *     tags:
- *       - Auth
- *     summary: Send OTP via Twilio SMS
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               phone:
- *                 type: string
+ *       - Subjects
+ *     summary: Get full learning path (subjects → chapters → topics)
  *     responses:
  *       200:
- *         description: OTP sent successfully
+ *         description: Full learning path structure
  */
-app.post('/auth/otp/send', async (req, res) => {
-  const { phone } = req.body;
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+app.get('/learning-path', async (req, res) => {
   try {
-    await twilioClient.messages.create({
-      body: `Your verification code is ${otp}`,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: phone
-    });
-    // For demo: In production, store this OTP securely in DB / Redis for verification
-    console.log(`OTP sent to ${phone}: ${otp}`);
-    res.json({ message: 'OTP sent successfully', otp }); // Expose OTP only in dev/test
+    const { data: subjects, error: subjectError } = await supabase.from('subjects').select('id, name');
+    if (subjectError) throw subjectError;
+
+    const result = await Promise.all(subjects.map(async (subject) => {
+      const { data: chapters, error: chaptersError } = await supabase
+        .from('chapters')
+        .select('id, name')
+        .eq('subject_id', subject.id);
+      if (chaptersError) throw chaptersError;
+
+      const chaptersWithTopics = await Promise.all(chapters.map(async (chapter) => {
+        const { data: topics, error: topicsError } = await supabase
+          .from('topics')
+          .select('id, name')
+          .eq('chapter_id', chapter.id);
+        if (topicsError) throw topicsError;
+
+        return {
+          id: chapter.id,
+          name: chapter.name,
+          topics: topics || [],
+        };
+      }));
+
+      return {
+        id: subject.id,
+        name: subject.name,
+        chapters: chaptersWithTopics,
+      };
+    }));
+
+    res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    res.status(500).json({ error: 'Failed to fetch learning path' });
   }
 });
 
 /**
  * @swagger
- * /auth/otp/verify:
+ * /topics/{topicId}/uploads:
+ *   delete:
+ *     tags:
+ *       - Topics
+ *     summary: Delete all uploads for a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All uploads deleted for the topic
+ *       404:
+ *         description: Topic not found
+ *       500:
+ *         description: Server error
+ */
+app.delete('/topics/:topicId/uploads', async (req, res) => {
+  const { topicId } = req.params;
+
+  const topic = await supabase.from('topics').select('id').eq('id', topicId).single();
+  if (!topic.data) return res.status(404).json({ error: 'Topic not found' });
+
+  const { error } = await supabase.from('topic_uploads').delete().eq('topic_id', topicId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.status(200).json({ message: 'All uploads deleted for this topic' });
+});
+
+/**
+ * @swagger
+ * /colleges:
  *   post:
  *     tags:
- *       - Auth
- *     summary: Verify OTP (mocked, you implement your logic)
+ *       - Colleges
+ *     summary: Add medical colleges
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               phone:
- *                 type: string
- *               otp:
- *                 type: string
+ *             type: array
+ *             items:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                 city:
+ *                   type: string
+ *                 state:
+ *                   type: string
+ *                 ownership:
+ *                   type: string
+ *                   enum: [Government, Private]
  *     responses:
- *       200:
- *         description: OTP verified successfully
+ *       201:
+ *         description: Colleges added successfully
  */
-app.post('/auth/otp/verify', async (req, res) => {
-  const { phone, otp } = req.body;
-  // For real: compare from DB / Redis. For now, accept anything.
-  console.log(`Verifying OTP ${otp} for phone ${phone}`);
-  res.json({ message: 'OTP verified successfully (mocked)' });
+app.post('/colleges', async (req, res) => {
+  const colleges = req.body;
+  const { data, error } = await supabase.from('colleges').insert(colleges).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
 });
 
+/**
+ * @swagger
+ * /colleges:
+ *   get:
+ *     tags:
+ *       - Colleges
+ *     summary: Get all medical colleges
+ *     responses:
+ *       200:
+ *         description: List of medical colleges
+ */
+app.get('/colleges', async (req, res) => {
+  const { data, error } = await supabase.from('colleges').select('*');
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(200).json(data);
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
