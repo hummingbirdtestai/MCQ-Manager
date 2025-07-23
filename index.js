@@ -7,7 +7,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 
 // ✅ Twilio Setup (from utils)
-const { client: twilioClient } = require('./utils/twilioClient');
+const { client } = require('./utils/twilioClient');
 
 const app = express();
 app.use(express.json());
