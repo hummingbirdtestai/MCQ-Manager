@@ -15,6 +15,53 @@ tags:
     description: Authentication via Twilio OTP
 
 paths:
+  /auth/otp/start:
+    post:
+      tags: [Auth]
+      summary: Send OTP to phone number using Twilio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  example: "+919876543210"
+      responses:
+        '200':
+          description: OTP sent successfully
+        '400':
+          description: Phone number is required
+        '500':
+          description: Failed to send OTP
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify OTP for a given phone number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  example: "+919876543210"
+                code:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: OTP verified successfully
+        '400':
+          description: Invalid code or phone
+        '500':
+          description: Failed to verify OTP
+
   /subjects:
     post:
       tags: [Subjects]
