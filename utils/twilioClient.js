@@ -10,4 +10,6 @@ if (!accountSid || !authToken) {
   throw new Error("Twilio initialization failed");
 }
 
-export const client = twilio(accountSid, authToken);
+const client = twilio(accountSid, authToken);
+
+module.exports = { client };
