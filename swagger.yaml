@@ -345,6 +345,33 @@ paths:
       responses:
         '200': { description: User profile }
 
+  /users/status/{phone}:
+    get:
+      tags: [Users]
+      summary: Check activation status of a user by phone number
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          schema:
+            type: string
+            example: "+919999999999"
+      responses:
+        '200':
+          description: Activation status returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isActive:
+                    type: boolean
+                    example: true
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
   /colleges:
     post:
       tags: [Colleges]
