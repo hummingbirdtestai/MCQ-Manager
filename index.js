@@ -944,29 +944,75 @@ app.get('/colleges', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - phone
  *             properties:
  *               phone:
  *                 type: string
+ *                 description: Phone number with country code (e.g., +91...)
  *                 example: '+919999999999'
  *     responses:
  *       200:
  *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: OTP sent
+ *                 status:
+ *                   type: string
+ *                   example: pending
+ *       400:
+ *         description: Invalid phone number format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid phone number format. Must start with + and include country code.
+ *       500:
+ *         description: Internal Server Error from Twilio
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid parameter
  */
 app.post('/auth/otp/start', async (req, res) => {
   const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+  // ✅ Validate: must be string, start with +, and have at least 10 digits
+  if (!phone || typeof phone !== 'string' || !phone.startsWith('+') || phone.length < 10) {
+    return res.status(400).json({
+      error: 'Invalid phone number format. Must start with + and include country code.',
+    });
+  }
 
   try {
-    const verification = await client.verify
+    const verification = await twilioClient.verify
       .services(process.env.TWILIO_SERVICE_SID)
-      .verifications.create({ to: phone, channel: 'sms' });
+      .verifications.create({
+        to: phone,
+        channel: 'sms',
+      });
 
-    res.status(200).json({ message: 'OTP sent', sid: verification.sid });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(200).json({
+      message: 'OTP sent',
+      status: verification.status,
+    });
+  } catch (error) {
+    console.error('❌ Twilio OTP Error:', error.message);
+    return res.status(500).json({ error: error.message });
   }
 });
-
 
 /**
  * @swagger
