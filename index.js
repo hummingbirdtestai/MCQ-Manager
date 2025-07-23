@@ -957,7 +957,7 @@ app.post('/auth/otp/start', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Phone number is required' });
 
   try {
-    const verification = await twilioClient.verify
+    const verification = await client.verify
       .services(process.env.TWILIO_SERVICE_SID)
       .verifications.create({ to: phone, channel: 'sms' });
 
@@ -966,6 +966,7 @@ app.post('/auth/otp/start', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 /**
  * @swagger
@@ -998,7 +999,7 @@ app.post('/auth/otp/verify', async (req, res) => {
   if (!phone || !code) return res.status(400).json({ error: 'Phone and code are required' });
 
   try {
-    const verificationCheck = await twilioClient.verify
+    const verificationCheck = await client.verify
       .services(process.env.TWILIO_SERVICE_SID)
       .verificationChecks.create({ to: phone, code });
 
@@ -1011,6 +1012,7 @@ app.post('/auth/otp/verify', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
