@@ -1059,6 +1059,56 @@ app.post('/auth/otp/verify', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /users/status/{phone}:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Check user activation status by phone number
+ *     parameters:
+ *       - in: path
+ *         name: phone
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 exists:
+ *                   type: boolean
+ *                 active:
+ *                   type: boolean
+ *                 user_id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ */
+app.get('/users/status/:phone', async (req, res) => {
+  const { phone } = req.params;
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, is_active')
+    .eq('phone', phone)
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return res.status(200).json({ exists: false, active: false });
+  }
+
+  res.status(200).json({
+    exists: true,
+    active: data.is_active === true,
+    user_id: data.id,
+    name: data.name
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
