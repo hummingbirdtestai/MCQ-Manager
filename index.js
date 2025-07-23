@@ -6,6 +6,9 @@ const { createClient } = require('@supabase/supabase-js');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 
+// ✅ Twilio Setup (from utils)
+const { client: twilioClient } = require('./utils/twilioClient');
+
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -926,6 +929,87 @@ app.get('/colleges', async (req, res) => {
   const { data, error } = await supabase.from('colleges').select('*');
   if (error) return res.status(500).json({ error: error.message });
   res.status(200).json(data);
+});
+
+/**
+ * @swagger
+ * /auth/otp/start:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: Send OTP to phone number
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: '+919999999999'
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ */
+app.post('/auth/otp/start', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+  try {
+    const verification = await twilioClient.verify
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verifications.create({ to: phone, channel: 'sms' });
+
+    res.status(200).json({ message: 'OTP sent', sid: verification.sid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /auth/otp/verify:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: Verify OTP for phone number
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: '+919999999999'
+ *               code:
+ *                 type: string
+ *                 example: '123456'
+ *     responses:
+ *       200:
+ *         description: OTP verified
+ *       400:
+ *         description: Invalid code or phone
+ */
+app.post('/auth/otp/verify', async (req, res) => {
+  const { phone, code } = req.body;
+  if (!phone || !code) return res.status(400).json({ error: 'Phone and code are required' });
+
+  try {
+    const verificationCheck = await twilioClient.verify
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verificationChecks.create({ to: phone, code });
+
+    if (verificationCheck.status === 'approved') {
+      res.status(200).json({ message: 'OTP verified successfully' });
+    } else {
+      res.status(400).json({ error: 'Invalid OTP' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
