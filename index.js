@@ -997,7 +997,7 @@ app.post('/auth/otp/start', async (req, res) => {
   }
 
   try {
-    const verification = await twilioClient.verify
+    const verification = await client.verify
       .services(process.env.TWILIO_SERVICE_SID)
       .verifications.create({
         to: phone,
