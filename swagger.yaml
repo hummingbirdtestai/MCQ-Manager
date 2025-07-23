@@ -70,8 +70,7 @@ paths:
               items:
                 type: object
                 properties:
-                  name:
-                    type: string
+                  name: { type: string }
       responses:
         '201': { description: Subjects created }
 
@@ -313,7 +312,7 @@ paths:
       responses:
         '200': { description: Leaderboard + user status }
 
-    /users/register:
+  /users/register:
     post:
       tags: [Users]
       summary: Register user
@@ -348,33 +347,33 @@ paths:
                   example: 'https://example.com/photo.jpg'
                 medical_college_id:
                   type: string
-                  format: uuid
                 year_of_joining:
                   type: integer
                   example: 2023
       responses:
-        '201':
-          description: User registered
+        '201': { description: User registered }
+
+  /users/status/{phone}:
+    get:
+      tags: [Users]
+      summary: Check user activation status by phone
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          schema:
+            type: string
+            example: "+919999999999"
+      responses:
+        '200':
+          description: User status
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id:
-                    type: string
-                  phone:
-                    type: string
-                  country_code:
-                    type: string
-                  email:
-                    type: string
-                  name:
-                    type: string
-                  medical_college_id:
-                    type: string
-                  year_of_joining:
-                    type: integer
-
+                  exists: { type: boolean }
+                  isActive: { type: boolean }
 
   /users/{id}:
     get:
@@ -387,33 +386,6 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: User profile }
-
-  /users/status/{phone}:
-    get:
-      tags: [Users]
-      summary: Check activation status of a user by phone number
-      parameters:
-        - in: path
-          name: phone
-          required: true
-          schema:
-            type: string
-            example: "+919999999999"
-      responses:
-        '200':
-          description: Activation status returned
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  isActive:
-                    type: boolean
-                    example: true
-        '404':
-          description: User not found
-        '500':
-          description: Server error
 
   /colleges:
     post:
