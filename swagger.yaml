@@ -356,24 +356,30 @@ paths:
   /users/status/{phone}:
     get:
       tags: [Users]
-      summary: Check user activation status by phone
+      summary: Check if user is registered and active
       parameters:
         - in: path
           name: phone
           required: true
           schema:
             type: string
-            example: "+919999999999"
+            example: "+919876543210"
       responses:
         '200':
-          description: User status
+          description: User status returned
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  exists: { type: boolean }
-                  isActive: { type: boolean }
+                  isNewUser:
+                    type: boolean
+                    example: false
+                  isActive:
+                    type: boolean
+                    example: true
+        '500':
+          description: Server error while checking status
 
   /users/{id}:
     get:
