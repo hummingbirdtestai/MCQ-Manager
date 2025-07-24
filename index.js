@@ -1119,7 +1119,9 @@ app.post('/auth/otp/verify', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         example: "+919876543210"
+ *         examples:
+ *           example1:
+ *             value: "+919876543210"
  *     responses:
  *       200:
  *         description: User activation status
