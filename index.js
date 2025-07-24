@@ -1135,13 +1135,10 @@ app.post('/auth/otp/verify', async (req, res) => {
  *       404:
  *         description: User not found
  */
-
 app.get('/users/status/:phone', async (req, res) => {
   const fullPhone = req.params.phone;
 
-  // Match E.164 format e.g., +919876543210
   const match = fullPhone.match(/^\+(\d{1,4})(\d{10})$/);
-
   if (!match) {
     return res.status(400).json({ error: 'Invalid phone format. Use +<countrycode><10-digit-number>' });
   }
@@ -1157,21 +1154,13 @@ app.get('/users/status/:phone', async (req, res) => {
       .eq('phone', phone)
       .limit(1);
 
-    if (error) {
-      console.error('❌ Supabase Error:', error.message);
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({ isActive: false, error: 'User not found' });
-    }
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data || data.length === 0) return res.status(404).json({ isActive: false, error: 'User not found' });
 
     const user = data[0];
     const isActive = user.status === 'active';
-
     return res.status(200).json({ isActive, user });
   } catch (e) {
-    console.error('❌ Server Error:', e.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
