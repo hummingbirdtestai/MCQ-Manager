@@ -29,7 +29,7 @@ const swaggerOptions = {
       { url: `http://localhost:${process.env.PORT || 3000}` }
     ]
   },
-  apis: ['./index.js']
+  apis: ['./index.js', './routes/*.js']
 };
 
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
