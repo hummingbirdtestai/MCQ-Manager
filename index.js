@@ -1111,8 +1111,8 @@ app.post('/auth/otp/verify', async (req, res) => {
  * /users/status/{phone}:
  *   get:
  *     tags:
-       - Users
- *     summary: Check if user is registered and active
+ *       - Users
+ *     summary: Check user activation status
  *     parameters:
  *       - in: path
  *         name: phone
@@ -1121,8 +1121,8 @@ app.post('/auth/otp/verify', async (req, res) => {
  *           type: string
  *         example: "+919876543210"
  *     responses:
- *       '200':
- *         description: User status returned
+ *       200:
+ *         description: User activation status
  *         content:
  *           application/json:
  *             schema:
@@ -1130,59 +1130,18 @@ app.post('/auth/otp/verify', async (req, res) => {
  *               properties:
  *                 isActive:
  *                   type: boolean
- *                   example: true
  *                 user:
  *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: "e123..."
- *                     name:
- *                       type: string
- *                       example: "John Doe"
- *                     phone:
- *                       type: string
- *                       example: "9999999999"
- *                     status:
- *                       type: string
- *                       example: "active"
- *                     email:
- *                       type: string
- *                       example: "john@example.com"
- *                     medical_college_id:
- *                       type: string
- *                       example: "abcd1234"
- *                     year_of_joining:
- *                       type: integer
- *                       example: 2022
- *       '404':
+ *       404:
  *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 isActive:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: User not found
- *       '500':
- *         description: Server error while checking status
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Internal server error
  */
+
 app.get('/users/status/:phone', async (req, res) => {
   const fullPhone = req.params.phone;
 
+  // Match E.164 format e.g., +919876543210
   const match = fullPhone.match(/^\+(\d{1,4})(\d{10})$/);
+
   if (!match) {
     return res.status(400).json({ error: 'Invalid phone format. Use +<countrycode><10-digit-number>' });
   }
@@ -1198,13 +1157,21 @@ app.get('/users/status/:phone', async (req, res) => {
       .eq('phone', phone)
       .limit(1);
 
-    if (error) return res.status(500).json({ error: error.message });
-    if (!data || data.length === 0) return res.status(404).json({ isActive: false, error: 'User not found' });
+    if (error) {
+      console.error('❌ Supabase Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ isActive: false, error: 'User not found' });
+    }
 
     const user = data[0];
     const isActive = user.status === 'active';
+
     return res.status(200).json({ isActive, user });
   } catch (e) {
+    console.error('❌ Server Error:', e.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
