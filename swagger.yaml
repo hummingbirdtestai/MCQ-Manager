@@ -355,7 +355,8 @@ paths:
 
   /users/status/{phone}:
     get:
-      tags: [Users]
+      tags:
+        - Users
       summary: Check if user is registered and active
       parameters:
         - in: path
