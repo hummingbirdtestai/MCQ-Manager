@@ -1109,68 +1109,63 @@ app.post('/auth/otp/verify', async (req, res) => {
  * @swagger
  * /users/status/{phone}:
  *   get:
- *     tags: [Users]
- *     summary: Check if user exists and is active by full phone number
+ *     tags:
+ *       - Users
+ *     summary: Check user activation status
  *     parameters:
  *       - in: path
  *         name: phone
  *         required: true
  *         schema:
  *           type: string
- *           example: "+919876543210"
+ *         example: "+919876543210"
  *     responses:
  *       200:
- *         description: User status check result
+ *         description: User activation status
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 exists:
- *                   type: boolean
  *                 isActive:
  *                   type: boolean
- *       400:
- *         description: Invalid phone number format
- *       500:
- *         description: Internal server error
+ *                 user:
+ *                   type: object
+ *       404:
+ *         description: User not found
  */
+
 app.get('/users/status/:phone', async (req, res) => {
-  const fullPhone = req.params.phone; // e.g., "+919876543210"
+  const rawPhone = req.params.phone;
 
-  // Split into country_code and phone number using regex
-  const match = fullPhone.match(/^\+(\d{1,4})(\d{7,15})$/);
-  if (!match) {
-    return res.status(400).json({ error: 'Invalid phone format. Must start with + and include country code.' });
-  }
-
-  const country_code = `+${match[1]}`;
-  const phone = match[2];
+  // Remove all non-digit characters (like +)
+  const sanitizedPhone = rawPhone.replace(/\D/g, '');
 
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('status')
-      .eq('country_code', country_code)
-      .eq('phone', phone)
+      .select('*')
+      .eq('phone', sanitizedPhone)
       .limit(1);
 
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      return res.status(200).json({ exists: false, isActive: false });
+    if (error) {
+      console.error('❌ Supabase Error:', error.message);
+      return res.status(500).json({ error: error.message });
     }
 
-    return res.status(200).json({
-      exists: true,
-      isActive: data[0].status === 'active',
-    });
-  } catch (error) {
-    console.error('❌ User Status API Error:', error.message);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    if (!data || data.length === 0) {
+      return res.status(404).json({ isActive: false, error: 'User not found' });
+    }
+
+    const user = data[0];
+    const isActive = user.status === 'active';
+
+    return res.status(200).json({ isActive, user });
+  } catch (e) {
+    console.error('❌ Server Error:', e.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
