@@ -372,12 +372,32 @@ paths:
               schema:
                 type: object
                 properties:
-                  isNewUser:
-                    type: boolean
-                    example: false
                   isActive:
                     type: boolean
                     example: true
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string, example: "e123..." }
+                      name: { type: string, example: "John Doe" }
+                      phone: { type: string, example: "9999999999" }
+                      status: { type: string, example: "active" }
+                      email: { type: string, example: "john@example.com" }
+                      medical_college_id: { type: string, example: "abcd1234" }
+                      year_of_joining: { type: integer, example: 2022 }
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isActive:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: User not found
         '500':
           description: Server error while checking status
 
