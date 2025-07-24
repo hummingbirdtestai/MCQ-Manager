@@ -1112,7 +1112,7 @@ app.post('/auth/otp/verify', async (req, res) => {
  *   get:
  *     tags:
  *       - Users
- *     summary: Check user activation status
+ *     summary: Check if user is registered and active
  *     parameters:
  *       - in: path
  *         name: phone
@@ -1122,7 +1122,7 @@ app.post('/auth/otp/verify', async (req, res) => {
  *         example: "+919876543210"
  *     responses:
  *       200:
- *         description: User activation status
+ *         description: User status returned
  *         content:
  *           application/json:
  *             schema:
@@ -1130,18 +1130,19 @@ app.post('/auth/otp/verify', async (req, res) => {
  *               properties:
  *                 isActive:
  *                   type: boolean
+ *                   example: true
  *                 user:
  *                   type: object
  *       404:
  *         description: User not found
+ *       500:
+ *         description: Server error while checking status
  */
-
 app.get('/users/status/:phone', async (req, res) => {
   const fullPhone = req.params.phone;
 
-  // Match E.164 format e.g., +919876543210
+  // Match E.164 format: +91XXXXXXXXXX
   const match = fullPhone.match(/^\+(\d{1,4})(\d{10})$/);
-
   if (!match) {
     return res.status(400).json({ error: 'Invalid phone format. Use +<countrycode><10-digit-number>' });
   }
@@ -1167,11 +1168,90 @@ app.get('/users/status/:phone', async (req, res) => {
     }
 
     const user = data[0];
-    const isActive = user.status === 'active';
+
+    // Case-insensitive check for 'Active'
+    const isActive = (user.registration_status || '').toLowerCase() === 'active';
 
     return res.status(200).json({ isActive, user });
   } catch (e) {
     console.error('❌ Server Error:', e.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /users/status:
+ *   patch:
+ *     tags:
+ *       - Users
+ *     summary: Toggle user registration status (Active <-> Inactive)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - country_code
+ *               - phone
+ *             properties:
+ *               country_code:
+ *                 type: string
+ *                 example: "+91"
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *     responses:
+ *       200:
+ *         description: Updated user status returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Missing phone or country code
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to toggle status
+ */
+app.patch('/users/status', async (req, res) => {
+  const { country_code, phone } = req.body;
+
+  if (!country_code || !phone) {
+    return res.status(400).json({ error: 'country_code and phone are required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('country_code', country_code)
+      .eq('phone', phone)
+      .limit(1);
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data || data.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const user = data[0];
+    const currentStatus = (user.registration_status || '').toLowerCase();
+    const newStatus = currentStatus === 'active' ? 'Inactive' : 'Active';
+
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ registration_status: newStatus })
+      .eq('id', user.id)
+      .select()
+      .limit(1);
+
+    if (updateError) return res.status(500).json({ error: updateError.message });
+
+    return res.status(200).json({ user: updatedUser[0] });
+  } catch (e) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
