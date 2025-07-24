@@ -132,9 +132,9 @@ paths:
                       phone:
                         type: string
                         example: "9999999999"
-                      status:
+                      registration_status:
                         type: string
-                        example: "active"
+                        example: "Active"
                       email:
                         type: string
                         example: "john@example.com"
@@ -167,6 +167,43 @@ paths:
                   error:
                     type: string
                     example: Internal server error
+
+  /users/status:
+    patch:
+      tags: [Users]
+      summary: Toggle user registration status (Active <-> Inactive)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - country_code
+                - phone
+              properties:
+                country_code:
+                  type: string
+                  example: "+91"
+                phone:
+                  type: string
+                  example: "9876543210"
+      responses:
+        '200':
+          description: Updated user returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+        '400':
+          description: Missing phone or country code
+        '404':
+          description: User not found
+        '500':
+          description: Failed to toggle status
 
   /users/{id}:
     get:
