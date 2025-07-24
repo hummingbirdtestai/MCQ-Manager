@@ -170,7 +170,8 @@ paths:
 
   /users/status:
     patch:
-      tags: [Users]
+      tags:
+        - Users
       summary: Toggle user registration status (Active <-> Inactive)
       requestBody:
         required: true
@@ -190,7 +191,7 @@ paths:
                   example: "9876543210"
       responses:
         '200':
-          description: Updated user returned
+          description: Updated user status returned
           content:
             application/json:
               schema:
