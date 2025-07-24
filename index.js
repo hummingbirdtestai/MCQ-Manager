@@ -1136,16 +1136,24 @@ app.post('/auth/otp/verify', async (req, res) => {
  */
 
 app.get('/users/status/:phone', async (req, res) => {
-  const rawPhone = req.params.phone;
+  const fullPhone = req.params.phone;
 
-  // Remove all non-digit characters (like +)
-  const sanitizedPhone = rawPhone.replace(/\D/g, '');
+  // Match E.164 format e.g., +919876543210
+  const match = fullPhone.match(/^\+(\d{1,4})(\d{10})$/);
+
+  if (!match) {
+    return res.status(400).json({ error: 'Invalid phone format. Use +<countrycode><10-digit-number>' });
+  }
+
+  const country_code = `+${match[1]}`;
+  const phone = match[2];
 
   try {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('phone', sanitizedPhone)
+      .eq('country_code', country_code)
+      .eq('phone', phone)
       .limit(1);
 
     if (error) {
