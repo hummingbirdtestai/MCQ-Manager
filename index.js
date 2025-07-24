@@ -1232,6 +1232,7 @@ app.patch('/users/status', async (req, res) => {
       .select('*')
       .eq('country_code', country_code)
       .eq('phone', phone)
+      .order('created_at', { ascending: false })  // ✅ FIX: Add explicit order
       .limit(1);
 
     if (error) return res.status(500).json({ error: error.message });
@@ -1246,6 +1247,7 @@ app.patch('/users/status', async (req, res) => {
       .update({ registration_status: newStatus })
       .eq('id', user.id)
       .select()
+      .order('created_at', { ascending: false })  // ✅ FIX: Add order here too
       .limit(1);
 
     if (updateError) return res.status(500).json({ error: updateError.message });
