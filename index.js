@@ -1424,24 +1424,44 @@ Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
  * @swagger
  * /generate-topic-step5:
  *   post:
+ *     tags: [AI Content]
  *     summary: Generate Step 5 MCQ content using GPT
+ *     description: Generate 10 clinical vignette MCQs with learning gaps and explanations for a topic using GPT-4, and store in Supabase.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - topic_id
+ *               - topic_title
  *             properties:
  *               topic_id:
  *                 type: string
+ *                 example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
  *               topic_title:
  *                 type: string
+ *                 example: "Describe composition of bone and bone marrow"
  *     responses:
  *       200:
  *         description: Step 5 content successfully generated and saved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: ✅ Step 5 content saved successfully
+ *       400:
+ *         description: Missing input or validation failed
+ *       500:
+ *         description: GPT or Supabase error
  */
 
 const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -1512,10 +1532,10 @@ JSON Format:
       ]
     });
 
-    const rawOutput = gptResponse.choices[0].message.content.trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '')
+    const rawOutput = gptResponse.choices[0].message.content
+      .trim()
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
       .replace(/\u200B/g, '');
 
     let parsed;
@@ -1526,7 +1546,7 @@ JSON Format:
       return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
     }
 
-    // Validate expected structure
+    // Validate top-level structure
     if (
       !parsed.step ||
       parsed.step !== 5 ||
@@ -1537,7 +1557,21 @@ JSON Format:
       return res.status(400).json({ error: '❌ GPT failed to return valid Step 5 JSON with 10 MCQs' });
     }
 
-    // Insert into Supabase
+    // Validate each MCQ structure
+    const allMCQsValid = parsed.content.mcqs.every(mcq =>
+      mcq.learning_gap &&
+      mcq.stem &&
+      mcq.options && typeof mcq.options === 'object' &&
+      ['A', 'B', 'C', 'D', 'E'].every(k => typeof mcq.options[k] === 'string') &&
+      ['A', 'B', 'C', 'D', 'E'].includes(mcq.correct_answer) &&
+      mcq.explanation
+    );
+
+    if (!allMCQsValid) {
+      return res.status(400).json({ error: '❌ One or more MCQs missing required fields' });
+    }
+
+    // Insert into Supabase (merge logic)
     const { data, error } = await supabase
       .from('topic_uploads')
       .upsert(
