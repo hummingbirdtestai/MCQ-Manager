@@ -31,6 +31,36 @@ ${topic_title}
 - Content should match NBME/UWorld/AMBOSS standard.
 `;
 
+async function generateValidStep4(topic_title) {
+  const prompt = promptTemplate(topic_title);
+
+  const chatCompletion = await openai.chat.completions.create({
+    model: 'gpt-4-1106-preview',
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: 'You are a USMLE-level medical educator generating valid JSON clinical chat.' },
+      { role: 'user', content: prompt }
+    ]
+  });
+
+  const raw = chatCompletion.choices[0].message.content.trim();
+  const cleaned = raw
+    .replace(/^```json/, '')
+    .replace(/^```/, '')
+    .replace(/```$/, '')
+    .replace(/\u200B/g, '');
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (parsed?.step === 4 && Array.isArray(parsed.content) && parsed.content.length === 60) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = async (req, res) => {
   const { topic_id, topic_title } = req.body;
 
@@ -39,51 +69,19 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // 1. Generate GPT output
-    const chatCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      temperature: 0.3,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a USMLE-level medical educator generating valid JSON clinical chat.'
-        },
-        {
-          role: 'user',
-          content: promptTemplate(topic_title)
-        }
-      ]
-    });
+    let parsed = await generateValidStep4(topic_title);
 
-    const gptOutputRaw = chatCompletion.choices[0].message.content;
-    console.log('📤 GPT Raw Output:', gptOutputRaw);
-
-    // 2. Clean output
-    const cleaned = gptOutputRaw.trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '')
-      .replace(/\u200B/g, '');
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (err) {
-      console.error('❌ JSON Parse Error:', err.message);
-      return res.status(500).json({ error: '❌ Invalid JSON format from GPT output', raw: gptOutputRaw });
+    // Retry once if invalid
+    if (!parsed) {
+      console.warn('⚠️ First GPT output invalid. Retrying...');
+      parsed = await generateValidStep4(topic_title);
     }
 
-    // 3. Validation
-    if (
-      !parsed ||
-      parsed.step !== 4 ||
-      !Array.isArray(parsed.content) ||
-      parsed.content.length !== 60
-    ) {
-      return res.status(400).json({ error: '❌ Step 4 format invalid or content not 60 messages', parsed });
+    if (!parsed) {
+      return res.status(400).json({ error: '❌ GPT failed to return valid Step 4 JSON with 60 messages' });
     }
 
-    // 4. Merge into Supabase
+    // 🔄 Check if topic_uploads exists
     const { data: existing, error: fetchError } = await supabase
       .from('topic_uploads')
       .select('id, content')
@@ -97,8 +95,8 @@ module.exports = async (req, res) => {
 
     if (existing && existing.length > 0) {
       const currentSteps = existing[0].content?.steps || [];
-      const withoutStep4 = currentSteps.filter((s) => s.step !== 4);
-      const updatedSteps = [...withoutStep4, parsed];
+      const filtered = currentSteps.filter((s) => s.step !== 4);
+      const updatedSteps = [...filtered, parsed];
 
       const { error: updateError } = await supabase
         .from('topic_uploads')
