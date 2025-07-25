@@ -1345,6 +1345,7 @@ app.post('/generate-topic-content', async (req, res) => {
  *       200:
  *         description: Step 4 content successfully generated and saved
  */
+
 app.post('/generate-topic-step4', async (req, res) => {
   try {
     const { topic_id, topic_title } = req.body;
@@ -1353,46 +1354,68 @@ app.post('/generate-topic-step4', async (req, res) => {
       return res.status(400).json({ error: 'Missing topic_id or topic_title' });
     }
 
-    const prompt = `🔷 PROMPT TO GENERATE USMLE-LEVEL STEP 4 CHAT ...` // your full Step 4 prompt here
+    const prompt = `
+You are an expert USMLE medical educator and structured data content developer.
+Your mission is to create high-yield, clinically precise content tailored to prepare medical students at the level of AMBOSS / UWorld / NBME standards.
 
-    const response = await openai.chat.completions.create({
+🎯 OBJECTIVE:
+Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
+
+🔷 TOPIC:
+<<TOPIC_TITLE>>
+
+🔷 CONTENT CREATION RULES:
+✅ Output must be a valid JSON object starting with { and ending with }
+✅ Do not include HTML, markdown, comments or explanation
+✅ Each clinical case should have exactly 10 teacher–student chat messages
+✅ Return 10 total cases
+✅ Each message is a JSON object with sender ("teacher" or "student") and html message content
+✅ Final output format:
+
+{
+  "step": 4,
+  "content": [
+    {
+      "case": 1,
+      "chat": [
+        { "sender": "teacher", "html": "..." },
+        { "sender": "student", "html": "..." },
+        ...
+      ]
+    },
+    ...
+  ]
+}
+    `.replace('<<TOPIC_TITLE>>', topic_title);
+
+    const gptResponse = await openai.chat.completions.create({
       model: 'gpt-4',
-      messages: [
-        {
-          role: 'user',
-          content: prompt.replace('<<TOPIC_TITLE>>', topic_title)
-        }
-      ],
+      messages: [{ role: 'user', content: prompt }],
       temperature: 0.7
     });
 
-    const jsonContent = JSON.parse(response.choices[0].message.content);
+    const contentJSON = JSON.parse(gptResponse.choices[0].message.content);
 
     const { data, error } = await supabase
       .from('topic_uploads')
       .upsert([
         {
           topic_id,
-          content: {
-            steps: [
-              { step: 4, content: jsonContent.content }
-            ]
-          }
+          content: { steps: [contentJSON] }
         }
       ], { onConflict: ['topic_id'] });
 
     if (error) {
-      console.error('Supabase insert error:', error);
+      console.error('❌ Supabase insert error:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    res.status(200).json({ message: 'Step 4 content saved successfully', data });
+    res.status(200).json({ message: '✅ Step 4 content saved successfully', data });
   } catch (err) {
-    console.error('Step 4 GPT error:', err);
+    console.error('❌ Step 4 GPT error:', err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
