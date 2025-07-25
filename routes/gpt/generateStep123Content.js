@@ -56,7 +56,7 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
   try {
     const chatCompletion = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
-      temperature: 0.7, // ✅ Optional, but helps for deterministic JSON
+      temperature: 0.7,
       messages: [
         {
           role: 'system',
@@ -72,7 +72,6 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
     const gptOutput = chatCompletion.choices[0].message.content;
     console.log('📤 GPT Raw Output:', gptOutput);
 
-    // Try parsing JSON output
     let parsed;
     try {
       parsed = JSON.parse(gptOutput);
@@ -81,7 +80,6 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
       return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
     }
 
-    // Ensure steps 1, 2, 3 are present
     if (
       !Array.isArray(parsed.steps) ||
       !parsed.steps.some((s) => s.step === 1) ||
@@ -91,7 +89,6 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
       return res.status(400).json({ error: 'Missing required steps (1–3) in GPT output' });
     }
 
-    // Upload to Supabase
     const { data, error } = await supabase
       .from('topic_uploads')
       .insert({ topic_id, content: parsed })
