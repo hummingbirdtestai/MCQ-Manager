@@ -12,7 +12,8 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'topic_id and topic_title are required' });
   }
 
-  const prompt = `You are an expert USMLE medical educator and structured data content developer.
+  const prompt = `Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
+
 Your mission is to create high-yield, clinically precise content tailored to prepare medical students at the level of AMBOSS / UWorld / NBME standards.
 
 🎯 OBJECTIVE:
@@ -69,12 +70,19 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
       ]
     });
 
-    const gptOutput = chatCompletion.choices[0].message.content;
-    console.log('📤 GPT Raw Output:', gptOutput);
+    const gptOutputRaw = chatCompletion.choices[0].message.content;
+    console.log('📤 GPT Raw Output:', gptOutputRaw);
+
+    // 🧹 Clean up any markdown-style wrappers or extra formatting
+    const cleaned = gptOutputRaw.trim()
+      .replace(/^```json/, '')
+      .replace(/^```/, '')
+      .replace(/```$/, '')
+      .replace(/\u200B/g, ''); // remove zero-width spaces if any
 
     let parsed;
     try {
-      parsed = JSON.parse(gptOutput);
+      parsed = JSON.parse(cleaned);
     } catch (err) {
       console.error('❌ JSON Parse Error:', err.message);
       return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
