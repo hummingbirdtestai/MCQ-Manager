@@ -11,6 +11,7 @@ const { client } = require('./utils/twilioClient');
 const generateTopicContent = require('./routes/gpt/generateTopicContent');
 const generateStep123Content = require('./routes/gpt/generateStep123Content');
 const generateStep4Content = require('./routes/gpt/generateStep4Content');
+const generateStep5Content = require('./generateStep5Content');
 
 const app = express();
 app.use(express.json());
@@ -19,6 +20,8 @@ app.use(cors());
 app.post('/generate-topic-content', generateTopicContent);
 app.post('/generate-topic-step123', generateStep123Content);
 app.post('/generate-topic-step4', generateStep4Content);
+app.post('/generate-topic-step5', require('./generateStep5Content'));
+
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -1416,6 +1419,144 @@ Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
     res.status(500).json({ error: err.message });
   }
 });
+
+/**
+ * @swagger
+ * /generate-topic-step5:
+ *   post:
+ *     summary: Generate Step 5 MCQ content using GPT
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               topic_id:
+ *                 type: string
+ *               topic_title:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Step 5 content successfully generated and saved
+ */
+
+const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+module.exports = async (req, res) => {
+  try {
+    const { topic_id, topic_title } = req.body;
+
+    if (!topic_id || !topic_title) {
+      return res.status(400).json({ error: 'Missing topic_id or topic_title' });
+    }
+
+    const prompt = `
+Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
+
+You are expert USMLE Step 1 and Step 2 coaching mentor.
+
+Topic: ${topic_title}
+
+Your mission:
+1. Identify 10 learning gaps that may hinder understanding of this topic.
+2. For each learning gap, generate 1 USMLE-style clinical vignette MCQ.
+3. Each MCQ must include:
+   - A 5–6 line clinical vignette stem
+   - 5 realistic options labeled A to E
+   - Correct answer key (A–E)
+   - A 10-sentence NBME/AMBOSS-style explanation (why correct is right + why others are wrong)
+
+JSON Format:
+{
+  "step": 5,
+  "content": {
+    "status": "success",
+    "topic": "${topic_title}",
+    "mcqs": [
+      {
+        "learning_gap": "...",
+        "stem": "...",
+        "options": {
+          "A": "...",
+          "B": "...",
+          "C": "...",
+          "D": "...",
+          "E": "..."
+        },
+        "correct_answer": "B",
+        "explanation": "..."
+      }
+      // ... total 10 MCQs
+    ]
+  }
+}
+`;
+
+    const gptResponse = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      temperature: 0.7,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert USMLE content developer. Follow the instructions strictly and output only valid JSON.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    });
+
+    const rawOutput = gptResponse.choices[0].message.content.trim()
+      .replace(/^```json/, '')
+      .replace(/^```/, '')
+      .replace(/```$/, '')
+      .replace(/\u200B/g, '');
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawOutput);
+    } catch (err) {
+      console.error('❌ JSON Parse Error:', err.message);
+      return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
+    }
+
+    // Validate expected structure
+    if (
+      !parsed.step ||
+      parsed.step !== 5 ||
+      !parsed.content ||
+      !Array.isArray(parsed.content.mcqs) ||
+      parsed.content.mcqs.length !== 10
+    ) {
+      return res.status(400).json({ error: '❌ GPT failed to return valid Step 5 JSON with 10 MCQs' });
+    }
+
+    // Insert into Supabase
+    const { data, error } = await supabase
+      .from('topic_uploads')
+      .upsert(
+        [{ topic_id, content: { steps: [parsed] } }],
+        { onConflict: ['topic_id'] }
+      );
+
+    if (error) {
+      console.error('❌ Supabase insert error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: '✅ Step 5 content saved successfully', data });
+  } catch (err) {
+    console.error('❌ Step 5 GPT error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
