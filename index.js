@@ -8,10 +8,13 @@ const swaggerJSDoc = require('swagger-jsdoc');
 
 // ✅ Twilio Setup (from utils)
 const { client } = require('./utils/twilioClient');
+const generateTopicContent = require('./routes/gpt/generateTopicContent');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+app.post('/generate-topic-content', generateTopicContent);
 
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
