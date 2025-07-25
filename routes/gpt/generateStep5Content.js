@@ -71,7 +71,8 @@ Every MCQ must have:
     const gptOutputRaw = chatCompletion.choices[0].message.content;
     console.log('📤 GPT Raw Output:', gptOutputRaw);
 
-    const cleaned = gptOutputRaw.trim()
+    const cleaned = gptOutputRaw
+      .trim()
       .replace(/^```json/, '')
       .replace(/^```/, '')
       .replace(/```$/, '')
@@ -86,11 +87,10 @@ Every MCQ must have:
     }
 
     if (
-      !parsed.step ||
       parsed.step !== 5 ||
       !parsed.content ||
       !Array.isArray(parsed.content.mcqs) ||
-      parsed.content.mcqs.length < 1
+      parsed.content.mcqs.length !== 10
     ) {
       return res.status(400).json({ error: 'Missing or invalid Step 5 MCQ structure' });
     }
@@ -105,10 +105,10 @@ Every MCQ must have:
 
     if (error) {
       console.error('❌ Supabase Insert Error:', error.message);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Supabase insert failed: ' + error.message });
     }
 
-    res.status(200).json({ message: '✅ Step 5 GPT content generated and stored', data });
+    res.status(200).json({ message: '✅ Step 5 MCQs successfully generated and stored', data });
   } catch (err) {
     console.error('❌ GPT Generation Error:', err.message);
     res.status(500).json({ error: 'Failed to generate Step 5 content' });
