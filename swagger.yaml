@@ -167,6 +167,63 @@ paths:
                     type: string
                     example: GPT generation failed
 
+  /generate-topic-step5:
+    post:
+      tags: [AI Content]
+      summary: Generate Step 5 MCQs using GPT
+      description: >
+        Generate 10 USMLE-style clinical vignette-based MCQs (Step 5) with learning gap mapping 
+        for a given topic and upload them to Supabase under the specified topic ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic_id
+                - topic_title
+              properties:
+                topic_id:
+                  type: string
+                  example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
+                topic_title:
+                  type: string
+                  example: "Demonstrate normal anatomical position, various planes, relation, comparison, laterality & movement in our body"
+      responses:
+        '200':
+          description: Step 5 MCQs successfully generated and stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: ✅ Step 5 MCQs generated and stored
+                  data:
+                    type: object
+        '400':
+          description: Missing topic_id or topic_title
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: topic_id and topic_title are required
+        '500':
+          description: GPT generation or Supabase error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: GPT generation failed
+
 
   /users/register:
     post:
