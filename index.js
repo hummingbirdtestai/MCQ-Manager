@@ -1258,6 +1258,66 @@ app.patch('/users/status', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /generate-topic-content:
+ *   post:
+ *     tags:
+ *       - AI Content
+ *     summary: Generate 6-step topic content using GPT
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               topic_id:
+ *                 type: string
+ *               topic_title:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: GPT content generated
+ */
+app.post('/generate-topic-content', async (req, res) => {
+  const { topic_id, topic_title } = req.body;
+  if (!topic_id || !topic_title) {
+    return res.status(400).json({ error: 'topic_id and topic_title are required' });
+  }
+
+  try {
+    const chatCompletion = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert USMLE-level medical educator. Generate structured JSON content in 6 steps for a topic.'
+        },
+        {
+          role: 'user',
+          content: `Generate content for topic: ${topic_title}. Each step must follow this JSON format: {"step": 1, "content": [...]}, ..., {"step": 6, "content": [...]}.`
+        }
+      ]
+    });
+
+    const gptContent = JSON.parse(chatCompletion.choices[0].message.content);
+
+    const { data, error } = await supabase
+      .from('topic_uploads')
+      .insert({ topic_id, content: gptContent })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.status(200).json({ message: 'GPT content generated and stored', data });
+  } catch (err) {
+    console.error('GPT Error:', err.message);
+    res.status(500).json({ error: 'GPT generation failed' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
