@@ -57,6 +57,42 @@ paths:
         '400': { description: Invalid OTP or phone number }
         '500': { description: Failed to verify OTP }
 
+  /generate-topic-content:
+    post:
+      tags: [AI Content]
+      summary: Generate 6-step JSON content using GPT and save to topic_uploads
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic_id
+                - topic_title
+              properties:
+                topic_id:
+                  type: string
+                  example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
+                topic_title:
+                  type: string
+                  example: "Describe composition of bone and bone marrow"
+      responses:
+        '200':
+          description: GPT content generated and saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: GPT content generated and stored
+                  data:
+                    type: object
+        '400': { description: Missing topic_id or topic_title }
+        '500': { description: GPT generation or database error }
+
   /users/register:
     post:
       tags: [Users]
