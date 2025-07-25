@@ -11,7 +11,7 @@ const { client } = require('./utils/twilioClient');
 const generateTopicContent = require('./routes/gpt/generateTopicContent');
 const generateStep123Content = require('./routes/gpt/generateStep123Content');
 const generateStep4Content = require('./routes/gpt/generateStep4Content');
-const generateStep5Content = require('./generateStep5Content');
+const generateStep5Content = require('./routes/gpt/generateStep5Content');
 
 const app = express();
 app.use(express.json());
