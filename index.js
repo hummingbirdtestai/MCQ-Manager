@@ -20,7 +20,7 @@ app.use(cors());
 app.post('/generate-topic-content', generateTopicContent);
 app.post('/generate-topic-step123', generateStep123Content);
 app.post('/generate-topic-step4', generateStep4Content);
-app.post('/generate-topic-step5', require('./generateStep5Content'));
+app.post('/generate-topic-step5', generateStep5Content);
 
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
