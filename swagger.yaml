@@ -14,7 +14,10 @@ tags:
   - name: Colleges
   - name: Auth
     description: Authentication via Twilio OTP
+  - name: AI Content
+    description: GPT-Generated Step-wise Content
 
+# ⬇ Full paths block continues here
 paths:
   /auth/otp/start:
     post:
