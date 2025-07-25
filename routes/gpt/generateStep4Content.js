@@ -1,5 +1,3 @@
-// routes/gpt/generateStep4Content.js
-
 const { OpenAI } = require('openai');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
@@ -7,15 +5,14 @@ require('dotenv').config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-const promptTemplate = (topic_title) => `Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
+const promptTemplate = (topic_title) => `Only output valid JSON. Do not use markdown or commentary. Do not wrap JSON in \`\`\`.
 
-You are an expert USMLE medical educator. Generate structured JSON content for STEP 4: Clinical Reasoning Chat.
+You are an expert USMLE medical educator. Generate structured JSON content for:
 
-🔷 Topic:
-${topic_title}
+🔷 STEP 4: Clinical Reasoning Chat  
+🔷 Topic: ${topic_title}
 
-✅ RULES:
-- Output must be:
+✅ FORMAT:
 {
   "step": 4,
   "content": [
@@ -25,21 +22,25 @@ ${topic_title}
   ]
 }
 
-- Exactly 60 messages alternating between teacher and student.
+✅ RULES:
+- Exactly 60 messages alternating teacher/student.
 - Use <strong> for keywords and <i> for clarifications.
-- No markdown, no explanations outside the JSON.
-- Content should match NBME/UWorld/AMBOSS standard.
-`;
+- Match AMBOSS / UWorld / NBME-level depth.
+- Output must be valid JSON only.`;
 
-async function generateValidStep4(topic_title) {
-  const prompt = promptTemplate(topic_title);
-
+async function tryGenerateStep4(topic_title) {
   const chatCompletion = await openai.chat.completions.create({
     model: 'gpt-4-1106-preview',
     temperature: 0.3,
     messages: [
-      { role: 'system', content: 'You are a USMLE-level medical educator generating valid JSON clinical chat.' },
-      { role: 'user', content: prompt }
+      {
+        role: 'system',
+        content: 'You are a USMLE-level educator. Return only valid JSON for Step 4.'
+      },
+      {
+        role: 'user',
+        content: promptTemplate(topic_title)
+      }
     ]
   });
 
@@ -52,13 +53,18 @@ async function generateValidStep4(topic_title) {
 
   try {
     const parsed = JSON.parse(cleaned);
-    if (parsed?.step === 4 && Array.isArray(parsed.content) && parsed.content.length === 60) {
+    if (
+      parsed?.step === 4 &&
+      Array.isArray(parsed.content) &&
+      parsed.content.length === 60
+    ) {
       return parsed;
     }
-    return null;
   } catch (e) {
-    return null;
+    // Continue retry
   }
+
+  return null;
 }
 
 module.exports = async (req, res) => {
@@ -68,20 +74,18 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: '❌ topic_id and topic_title are required' });
   }
 
+  let parsed = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    parsed = await tryGenerateStep4(topic_title);
+    if (parsed) break;
+    console.warn(`⚠️ GPT output invalid on attempt ${attempt}. Retrying...`);
+  }
+
+  if (!parsed) {
+    return res.status(400).json({ error: '❌ GPT failed to return valid Step 4 JSON with 60 messages' });
+  }
+
   try {
-    let parsed = await generateValidStep4(topic_title);
-
-    // Retry once if invalid
-    if (!parsed) {
-      console.warn('⚠️ First GPT output invalid. Retrying...');
-      parsed = await generateValidStep4(topic_title);
-    }
-
-    if (!parsed) {
-      return res.status(400).json({ error: '❌ GPT failed to return valid Step 4 JSON with 60 messages' });
-    }
-
-    // 🔄 Check if topic_uploads exists
     const { data: existing, error: fetchError } = await supabase
       .from('topic_uploads')
       .select('id, content')
@@ -118,7 +122,11 @@ module.exports = async (req, res) => {
       }
     }
 
-    return res.status(200).json({ message: '✅ Step 4 GPT content generated and stored', step: 4, data: parsed });
+    return res.status(200).json({
+      message: '✅ Step 4 GPT content generated and stored',
+      step: 4,
+      data: parsed
+    });
   } catch (err) {
     console.error('❌ GPT Generation Error:', err.message);
     return res.status(500).json({ error: '❌ GPT or Supabase error', details: err.message });
