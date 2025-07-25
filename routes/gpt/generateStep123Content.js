@@ -52,6 +52,16 @@ Create another 30-row 2-column table of high-yield clinical insights and memory 
 Column A = Fact / Clinical Insight.
 Column B = Clarifying explanation, hint, or pathophysiology link.
 Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, ...]}
+
+📦 FINAL OUTPUT FORMAT:
+Wrap all 3 steps inside one object like this:
+{
+  "steps": [
+    { "step": 1, "content": [...] },
+    { "step": 2, "content": [...] },
+    { "step": 3, "content": [...] }
+  ]
+}
 `;
 
   try {
@@ -73,12 +83,12 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
     const gptOutputRaw = chatCompletion.choices[0].message.content;
     console.log('📤 GPT Raw Output:', gptOutputRaw);
 
-    // 🧹 Clean up any markdown-style wrappers or extra formatting
+    // Clean up any markdown wrappers and hidden characters
     const cleaned = gptOutputRaw.trim()
       .replace(/^```json/, '')
       .replace(/^```/, '')
       .replace(/```$/, '')
-      .replace(/\u200B/g, ''); // remove zero-width spaces if any
+      .replace(/\u200B/g, '');
 
     let parsed;
     try {
