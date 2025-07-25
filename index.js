@@ -12,6 +12,7 @@ const generateTopicContent = require('./routes/gpt/generateTopicContent');
 const generateStep123Content = require('./routes/gpt/generateStep123Content');
 const generateStep4Content = require('./routes/gpt/generateStep4Content');
 const generateStep5Content = require('./routes/gpt/generateStep5Content');
+const generateStep6Content = require('./routes/gpt/generateStep6Content');
 
 const app = express();
 app.use(express.json());
@@ -21,6 +22,7 @@ app.post('/generate-topic-content', generateTopicContent);
 app.post('/generate-topic-step123', generateStep123Content);
 app.post('/generate-topic-step4', generateStep4Content);
 app.post('/generate-topic-step5', generateStep5Content);
+app.post('/generate-topic-step6', generateStep6Content);
 
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -1586,6 +1588,161 @@ JSON Format:
   } catch (err) {
     console.error('❌ Step 5 GPT error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * @swagger
+ * /generate-topic-step6:
+ *   post:
+ *     tags: [AI Content]
+ *     summary: Generate Step 6 Media Library using GPT
+ *     description: >
+ *       Generates 10 high-yield videos and 10 high-yield images for a topic's Media Library (Step 6),
+ *       including keywords and descriptions for each. Stores the result in Supabase under `topic_uploads`.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - topic_id
+ *               - topic_title
+ *             properties:
+ *               topic_id:
+ *                 type: string
+ *                 example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
+ *               topic_title:
+ *                 type: string
+ *                 example: "Superior intercostal artery"
+ *     responses:
+ *       200:
+ *         description: Step 6 content successfully generated and saved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: ✅ Step 6 content saved successfully
+ *       400:
+ *         description: Missing input or validation failed
+ *       500:
+ *         description: GPT or Supabase error
+ */
+
+const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+module.exports = async (req, res) => {
+  const { topic_id, topic_title } = req.body;
+
+  if (!topic_id || !topic_title) {
+    return res.status(400).json({ error: 'Missing topic_id or topic_title' });
+  }
+
+  const prompt = `Only output valid JSON. No markdown, headings, comments, or HTML.
+
+You are an expert medical educator who creates high-yield, exam-focused content for USMLE, NBME, AMBOSS, and UWorld.
+
+Topic: ${topic_title}
+
+Your task:
+1. Create 10 YouTube-style video search entries with educational descriptions.
+2. Create 10 Google Images-style search entries with descriptions.
+3. Content should focus on anatomy origin, course, relations, branches, termination, and clinical relevance.
+
+Strict JSON format:
+{
+  "step": 6,
+  "content": [
+    {
+      "videos": [
+        {
+          "keyword": "...",
+          "description": "..."
+        }
+        // ... 10 total
+      ],
+      "images": [
+        {
+          "keyword": "...",
+          "description": "..."
+        }
+        // ... 10 total
+      ]
+    }
+  ]
+}`;
+
+  try {
+    const chatCompletion = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      temperature: 0.7,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a strict medical content generator. Return only valid JSON. Format strictly.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    });
+
+    const raw = chatCompletion.choices[0].message.content.trim()
+      .replace(/^```json/, '')
+      .replace(/^```/, '')
+      .replace(/```$/, '')
+      .replace(/\u200B/g, '');
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      console.error('❌ JSON Parse Error:', err.message);
+      return res.status(500).json({ error: 'Invalid JSON from GPT' });
+    }
+
+    // Validate structure
+    if (
+      parsed.step !== 6 ||
+      !Array.isArray(parsed.content) ||
+      parsed.content.length !== 1 ||
+      !Array.isArray(parsed.content[0].videos) ||
+      !Array.isArray(parsed.content[0].images) ||
+      parsed.content[0].videos.length !== 10 ||
+      parsed.content[0].images.length !== 10
+    ) {
+      return res.status(400).json({ error: 'Invalid Step 6 format. Expected 10 videos and 10 images.' });
+    }
+
+    // Save to Supabase
+    const finalPayload = { steps: [parsed] };
+
+    const { data, error } = await supabase
+      .from('topic_uploads')
+      .upsert(
+        [{ topic_id, content: finalPayload }],
+        { onConflict: ['topic_id'] }
+      );
+
+    if (error) {
+      console.error('❌ Supabase Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: '✅ Step 6 content saved successfully', data });
+  } catch (err) {
+    console.error('❌ GPT Error:', err.message);
+    res.status(500).json({ error: 'Failed to generate Step 6 content' });
   }
 };
 
