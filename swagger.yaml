@@ -112,6 +112,62 @@ paths:
                     type: string
                     example: GPT generation failed
 
+  /generate-topic-step4:
+    post:
+      tags: [AI Content]
+      summary: Generate Step 4 clinical reasoning chat using GPT
+      description: Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload to Supabase.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic_id
+                - topic_title
+              properties:
+                topic_id:
+                  type: string
+                  example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
+                topic_title:
+                  type: string
+                  example: "Describe composition of bone and bone marrow"
+      responses:
+        '200':
+          description: Step 4 content successfully generated and saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: ✅ Step 4 content generated and stored
+                  data:
+                    type: object
+        '400':
+          description: Missing topic_id or topic_title
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: topic_id and topic_title are required
+        '500':
+          description: GPT generation or Supabase error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: GPT generation failed
+
+
   /users/register:
     post:
       tags: [Users]
