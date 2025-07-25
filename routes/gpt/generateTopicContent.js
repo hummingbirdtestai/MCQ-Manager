@@ -14,13 +14,13 @@ const stepPrompts = [
   (title) => `Step 6: Generate 10 media keywords and YouTube/video suggestions for "${title}". Output JSON: {"step":6,"content":[{keyword,description}]}`
 ];
 
-// Parse + Retry on JSON parse failure
 const parseGPT = async (fn, retries = 2) => {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const chat = await fn();
       return JSON.parse(chat.choices[0].message.content);
     } catch (err) {
+      console.error(`❌ Error parsing GPT response (Attempt ${attempt + 1}):`, err.message);
       if (attempt === retries) throw err;
     }
   }
@@ -40,26 +40,31 @@ module.exports = async (req, res) => {
         openai.chat.completions.create({
           model: 'gpt-4-1106-preview',
           messages: [
-            { role: 'system', content: 'You are a medical educator. Output must be valid JSON with no extra text.' },
+            {
+              role: 'system',
+              content: 'You are a strict JSON generator. Output ONLY valid JSON starting with { and ending with } without any explanations, markdown, or commentary.'
+            },
             { role: 'user', content: prompt }
           ]
         })
       );
 
-      if (!result.content || !Array.isArray(result.content)) {
-        throw new Error(`Step ${i + 1} content invalid`);
+      if (!result || !Array.isArray(result.content)) {
+        throw new Error(`Step ${i + 1} content is invalid or missing`);
       }
 
-      steps.push({ step: i + 1, content: result.content });
+      steps.push(result); // push full step object {step, content}
     }
 
     const finalContent = { steps };
 
-    // Optional deep validation (e.g., ensure step 5 has MCQ format)
     const step5 = finalContent.steps.find((s) => s.step === 5);
     if (
       !step5 ||
-      !step5.content.every((m) => m.stem && m.options && m.correct_answer && m.explanation)
+      !Array.isArray(step5.content) ||
+      !step5.content.every((m) =>
+        m.stem && m.options && m.correct_answer && m.explanation && m.learning_gap
+      )
     ) {
       return res.status(400).json({ error: 'Invalid MCQ format in Step 5' });
     }
