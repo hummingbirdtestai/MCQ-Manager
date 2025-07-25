@@ -7,18 +7,19 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 module.exports = async (req, res) => {
   const { topic_id, topic_title } = req.body;
+
   if (!topic_id || !topic_title) {
     return res.status(400).json({ error: 'topic_id and topic_title are required' });
   }
 
-  const systemPrompt = `You are an expert USMLE medical educator and structured data content developer.
+  const prompt = `You are an expert USMLE medical educator and structured data content developer.
 Your mission is to create high-yield, clinically precise content tailored to prepare medical students at the level of AMBOSS / UWorld / NBME standards.
 
 🎯 OBJECTIVE:
 Generate structured JSON content for a React-based mobile learning platform.
 
 🔷 TOPIC:
-<<Describe composition of bone and bone marrow>>  ← Replace with any medical topic
+${topic_title}
 
 🔷 CONTENT CREATION RULES:
 ✅ General Rules for Output:
@@ -53,8 +54,6 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
 `;
 
   try {
-    const promptWithTopic = systemPrompt.replace('<<Describe composition of bone and bone marrow>>', topic_title);
-
     const chatCompletion = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       messages: [
@@ -64,35 +63,47 @@ Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, 
         },
         {
           role: 'user',
-          content: promptWithTopic
+          content: prompt
         }
       ]
     });
 
-    const contentJSON = JSON.parse(chatCompletion.choices[0].message.content);
+    const gptOutput = chatCompletion.choices[0].message.content;
 
-    // ✅ Validate required steps and structure
-    if (
-      !Array.isArray(contentJSON.steps) ||
-      !contentJSON.steps.find((s) => s.step === 1) ||
-      !contentJSON.steps.find((s) => s.step === 2) ||
-      !contentJSON.steps.find((s) => s.step === 3)
-    ) {
-      return res.status(400).json({ error: 'Missing required steps (1–3) in output' });
+    // Parse and validate
+    let parsed;
+    try {
+      parsed = JSON.parse(gptOutput);
+    } catch (err) {
+      console.error('❌ JSON Parse Error:', err.message);
+      return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
     }
 
-    // ✅ Upload to Supabase
+    // Validate structure
+    if (
+      !Array.isArray(parsed.steps) ||
+      !parsed.steps.find((s) => s.step === 1) ||
+      !parsed.steps.find((s) => s.step === 2) ||
+      !parsed.steps.find((s) => s.step === 3)
+    ) {
+      return res.status(400).json({ error: 'Missing required steps (1–3) in GPT output' });
+    }
+
+    // Upload to Supabase
     const { data, error } = await supabase
       .from('topic_uploads')
-      .insert({ topic_id, content: contentJSON })
+      .insert({ topic_id, content: parsed })
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('❌ Supabase Insert Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
 
     res.status(200).json({ message: '✅ Step 1–3 GPT content generated and stored', data });
   } catch (err) {
-    console.error('❌ GPT Error:', err.message);
+    console.error('❌ GPT Generation Error:', err.message);
     res.status(500).json({ error: 'Failed to generate step 1–3 content' });
   }
 };
