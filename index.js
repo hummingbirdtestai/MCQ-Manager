@@ -9,12 +9,14 @@ const swaggerJSDoc = require('swagger-jsdoc');
 // ✅ Twilio Setup (from utils)
 const { client } = require('./utils/twilioClient');
 const generateTopicContent = require('./routes/gpt/generateTopicContent');
+const { generateStep123Handler } = require('./routes/gpt/generateTopicContent');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
 app.post('/generate-topic-content', generateTopicContent);
+app.post('/generate-topic-step123', generateStep123Handler);
 
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -1263,11 +1265,11 @@ app.patch('/users/status', async (req, res) => {
 
 /**
  * @swagger
- * /generate-topic-content:
+ * /generate-topic-step123:
  *   post:
  *     tags:
  *       - AI Content
- *     summary: Generate 6-step topic content using GPT
+ *     summary: Generate Step 1–3 content using GPT
  *     requestBody:
  *       required: true
  *       content:
@@ -1281,8 +1283,9 @@ app.patch('/users/status', async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: GPT content generated
+ *         description: Step 1–3 GPT content generated and stored
  */
+app.post('/generate-topic-step123', generateStep123Content);
 app.post('/generate-topic-content', async (req, res) => {
   const { topic_id, topic_title } = req.body;
   if (!topic_id || !topic_title) {
