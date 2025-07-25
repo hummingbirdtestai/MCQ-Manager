@@ -1,0 +1,98 @@
+const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+module.exports = async (req, res) => {
+  const { topic_id, topic_title } = req.body;
+  if (!topic_id || !topic_title) {
+    return res.status(400).json({ error: 'topic_id and topic_title are required' });
+  }
+
+  const systemPrompt = `You are an expert USMLE medical educator and structured data content developer.
+Your mission is to create high-yield, clinically precise content tailored to prepare medical students at the level of AMBOSS / UWorld / NBME standards.
+
+🎯 OBJECTIVE:
+Generate structured JSON content for a React-based mobile learning platform.
+
+🔷 TOPIC:
+<<Describe composition of bone and bone marrow>>  ← Replace with any medical topic
+
+🔷 CONTENT CREATION RULES:
+✅ General Rules for Output:
+
+Output must be a valid JSON object starting with { and ending with }.
+
+Do not include any explanations, markdown, headings, or commentary.
+
+Do not include HTML page structure like <html>, <head>, <style>, or <script>.
+
+Emojis are allowed.
+
+Inline formatting <strong> for keywords and <i> for clarifications is allowed.
+
+Content must be clean, high-yield, and clinically aligned with AMBOSS, UWorld, NBME quality.
+
+Ensure JSON can be parsed directly into a React app.
+
+🔷 STEP 1: CLINICAL TEACHER–STUDENT CHAT
+Simulate a detailed 30-message conversation between a teacher 👨‍🏫 and a student 🧑‍🎓 about the topic. Include teaching questions, answers, clinical reasoning, concept explanation, and visual analogies.
+Output: {"step": 1, "content": [{ "sender": "teacher", "html": "..." }, { "sender": "student", "html": "..." }, ...]}
+
+🔷 STEP 2: BUZZWORD ACTIVE RECALL TABLE
+Create a 30-row 2-column table where Column A is a buzzword (frequently tested keyword or term), and Column B is the high-yield point it refers to.
+Output: {"step": 2, "content": [{ "buzzword": "...", "highYieldPoint": "..." }, ...]}
+
+🔷 STEP 3: HIGH-YIELD MASTERY TABLE
+Create another 30-row 2-column table of high-yield clinical insights and memory anchors.
+Column A = Fact / Clinical Insight.
+Column B = Clarifying explanation, hint, or pathophysiology link.
+Output: {"step": 3, "content": [{ "buzzword": "...", "clarifyingFact": "..." }, ...]}
+`;
+
+  try {
+    const promptWithTopic = systemPrompt.replace('<<Describe composition of bone and bone marrow>>', topic_title);
+
+    const chatCompletion = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert USMLE-level medical educator. Follow all output rules and generate valid structured JSON.'
+        },
+        {
+          role: 'user',
+          content: promptWithTopic
+        }
+      ]
+    });
+
+    const contentJSON = JSON.parse(chatCompletion.choices[0].message.content);
+
+    // ✅ Validate required steps and structure
+    if (
+      !Array.isArray(contentJSON.steps) ||
+      !contentJSON.steps.find((s) => s.step === 1) ||
+      !contentJSON.steps.find((s) => s.step === 2) ||
+      !contentJSON.steps.find((s) => s.step === 3)
+    ) {
+      return res.status(400).json({ error: 'Missing required steps (1–3) in output' });
+    }
+
+    // ✅ Upload to Supabase
+    const { data, error } = await supabase
+      .from('topic_uploads')
+      .insert({ topic_id, content: contentJSON })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.status(200).json({ message: '✅ Step 1–3 GPT content generated and stored', data });
+  } catch (err) {
+    console.error('❌ GPT Error:', err.message);
+    res.status(500).json({ error: 'Failed to generate step 1–3 content' });
+  }
+};
