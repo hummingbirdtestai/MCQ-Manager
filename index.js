@@ -10,6 +10,7 @@ const swaggerJSDoc = require('swagger-jsdoc');
 const { client } = require('./utils/twilioClient');
 const generateTopicContent = require('./routes/gpt/generateTopicContent');
 const generateStep123Content = require('./routes/gpt/generateStep123Content');
+const generateStep4Content = require('./routes/gpt/generateStep4Content');
 
 const app = express();
 app.use(express.json());
@@ -17,7 +18,7 @@ app.use(cors());
 
 app.post('/generate-topic-content', generateTopicContent);
 app.post('/generate-topic-step123', generateStep123Content);
-
+app.post('/generate-topic-step4', generateStep4Content);
 // Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -1323,6 +1324,75 @@ app.post('/generate-topic-content', async (req, res) => {
     res.status(500).json({ error: 'GPT generation failed' });
   }
 });
+
+/**
+ * @swagger
+ * /generate-topic-step4:
+ *   post:
+ *     summary: Generate Step 4 clinical reasoning chat using GPT
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               topic_id:
+ *                 type: string
+ *               topic_title:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Step 4 content successfully generated and saved
+ */
+app.post('/generate-topic-step4', async (req, res) => {
+  try {
+    const { topic_id, topic_title } = req.body;
+
+    if (!topic_id || !topic_title) {
+      return res.status(400).json({ error: 'Missing topic_id or topic_title' });
+    }
+
+    const prompt = `🔷 PROMPT TO GENERATE USMLE-LEVEL STEP 4 CHAT ...` // your full Step 4 prompt here
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'user',
+          content: prompt.replace('<<TOPIC_TITLE>>', topic_title)
+        }
+      ],
+      temperature: 0.7
+    });
+
+    const jsonContent = JSON.parse(response.choices[0].message.content);
+
+    const { data, error } = await supabase
+      .from('topic_uploads')
+      .upsert([
+        {
+          topic_id,
+          content: {
+            steps: [
+              { step: 4, content: jsonContent.content }
+            ]
+          }
+        }
+      ], { onConflict: ['topic_id'] });
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Step 4 content saved successfully', data });
+  } catch (err) {
+    console.error('Step 4 GPT error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
