@@ -5,13 +5,7 @@ require('dotenv').config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-module.exports = async (req, res) => {
-  const { topic_id, topic_title } = req.body;
-
-  if (!topic_id || !topic_title) {
-    return res.status(400).json({ error: 'topic_id and topic_title are required' });
-  }
-
+async function generateContent(topic_title) {
   const prompt = `Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
 
 You are expert USMLE Step 1 and Step 2 coaching classes Mentor.
@@ -52,65 +46,80 @@ Every MCQ must have:
 }
 `;
 
-  try {
-    const chatCompletion = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      temperature: 0.7,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert USMLE-level medical educator. Follow all output rules and generate valid structured JSON.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
+  const chatCompletion = await openai.chat.completions.create({
+    model: 'gpt-4-1106-preview',
+    temperature: 0.7,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are an expert USMLE-level medical educator. Follow all output rules and generate valid structured JSON.'
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ]
+  });
 
-    const gptOutputRaw = chatCompletion.choices[0].message.content;
-    console.log('📤 GPT Raw Output:', gptOutputRaw);
+  return chatCompletion.choices[0].message.content;
+}
 
-    const cleaned = gptOutputRaw
-      .trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '')
-      .replace(/\u200B/g, '');
+module.exports = async (req, res) => {
+  const { topic_id, topic_title } = req.body;
 
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (err) {
-      console.error('❌ JSON Parse Error:', err.message);
-      return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
-    }
-
-    if (
-      parsed.step !== 5 ||
-      !parsed.content ||
-      !Array.isArray(parsed.content.mcqs) ||
-      parsed.content.mcqs.length !== 10
-    ) {
-      return res.status(400).json({ error: 'Missing or invalid Step 5 MCQ structure' });
-    }
-
-    const finalPayload = { steps: [parsed] };
-
-    const { data, error } = await supabase
-      .from('topic_uploads')
-      .insert({ topic_id, content: finalPayload })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ Supabase Insert Error:', error.message);
-      return res.status(500).json({ error: 'Supabase insert failed: ' + error.message });
-    }
-
-    res.status(200).json({ message: '✅ Step 5 MCQs successfully generated and stored', data });
-  } catch (err) {
-    console.error('❌ GPT Generation Error:', err.message);
-    res.status(500).json({ error: 'Failed to generate Step 5 content' });
+  if (!topic_id || !topic_title) {
+    return res.status(400).json({ error: 'topic_id and topic_title are required' });
   }
+
+  let gptOutputRaw = '';
+  let parsed = null;
+  let retry = false;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      gptOutputRaw = await generateContent(topic_title);
+      console.log(`📤 GPT Raw Output [Attempt ${attempt}]:`, gptOutputRaw);
+
+      const cleaned = gptOutputRaw
+        .trim()
+        .replace(/^```json/, '')
+        .replace(/^```/, '')
+        .replace(/```$/, '')
+        .replace(/\u200B/g, '');
+
+      parsed = JSON.parse(cleaned);
+
+      if (
+        parsed.step === 5 &&
+        parsed.content &&
+        Array.isArray(parsed.content.mcqs) &&
+        parsed.content.mcqs.length === 10
+      ) {
+        break; // ✅ Valid output
+      } else {
+        throw new Error('Step 5 structure is incomplete or incorrect');
+      }
+    } catch (err) {
+      console.error(`❌ Attempt ${attempt} failed:`, err.message);
+      if (attempt === 2) {
+        return res.status(400).json({ error: 'Missing or invalid Step 5 MCQ structure' });
+      }
+      retry = true;
+    }
+  }
+
+  const finalPayload = { steps: [parsed] };
+
+  const { data, error } = await supabase
+    .from('topic_uploads')
+    .insert({ topic_id, content: finalPayload })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Supabase Insert Error:', error.message);
+    return res.status(500).json({ error: 'Supabase insert failed: ' + error.message });
+  }
+
+  return res.status(200).json({ message: '✅ Step 5 MCQs successfully generated and stored', data });
 };
