@@ -1463,6 +1463,7 @@ Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
  */
 
 const { OpenAI } = require('openai');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 require('dotenv').config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
