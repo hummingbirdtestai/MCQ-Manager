@@ -147,7 +147,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ✅ Step 4 content generated and stored
+                    example: "✅ Step 4 content generated and stored"
                   data:
                     type: object
         '400':
@@ -159,7 +159,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: topic_id and topic_title are required
+                    example: "topic_id and topic_title are required"
         '500':
           description: GPT generation or Supabase error
           content:
@@ -169,7 +169,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: GPT generation failed
+                    example: "GPT generation failed"
 
   /generate-topic-step5:
     post:
