@@ -1448,35 +1448,26 @@ Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
  *     responses:
  *       200:
  *         description: Step 5 content successfully generated and saved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: ✅ Step 5 content saved successfully
  *       400:
  *         description: Missing input or validation failed
  *       500:
  *         description: GPT or Supabase error
  */
 
-const { OpenAI } = require('openai');
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 require('dotenv').config();
+const { OpenAI } = require('openai');
+const { createClient } = require('@supabase/supabase-js');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-module.exports = async (req, res) => {
-  try {
-    const { topic_id, topic_title } = req.body;
+const handleGenerateStep5 = async (req, res) => {
+  const { topic_id, topic_title } = req.body;
+  if (!topic_id || !topic_title) {
+    return res.status(400).json({ error: 'Missing topic_id or topic_title' });
+  }
 
-    if (!topic_id || !topic_title) {
-      return res.status(400).json({ error: 'Missing topic_id or topic_title' });
-    }
-
-    const prompt = `
+  const prompt = `
 Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
 
 You are expert USMLE Step 1 and Step 2 coaching mentor.
@@ -1512,12 +1503,12 @@ JSON Format:
         "correct_answer": "B",
         "explanation": "..."
       }
-      // ... total 10 MCQs
     ]
   }
 }
 `;
 
+  try {
     const gptResponse = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       temperature: 0.7,
@@ -1526,10 +1517,7 @@ JSON Format:
           role: 'system',
           content: 'You are an expert USMLE content developer. Follow the instructions strictly and output only valid JSON.'
         },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'user', content: prompt }
       ]
     });
 
@@ -1539,27 +1527,18 @@ JSON Format:
       .replace(/```/g, '')
       .replace(/\u200B/g, '');
 
-    let parsed;
-    try {
-      parsed = JSON.parse(rawOutput);
-    } catch (err) {
-      console.error('❌ JSON Parse Error:', err.message);
-      return res.status(500).json({ error: 'Invalid JSON format from GPT output' });
-    }
+    const parsed = JSON.parse(rawOutput);
 
-    // Validate top-level structure
     if (
-      !parsed.step ||
       parsed.step !== 5 ||
       !parsed.content ||
       !Array.isArray(parsed.content.mcqs) ||
       parsed.content.mcqs.length !== 10
     ) {
-      return res.status(400).json({ error: '❌ GPT failed to return valid Step 5 JSON with 10 MCQs' });
+      return res.status(400).json({ error: '❌ GPT did not return valid Step 5 format with 10 MCQs' });
     }
 
-    // Validate each MCQ structure
-    const allMCQsValid = parsed.content.mcqs.every(mcq =>
+    const allValid = parsed.content.mcqs.every(mcq =>
       mcq.learning_gap &&
       mcq.stem &&
       mcq.options && typeof mcq.options === 'object' &&
@@ -1568,27 +1547,23 @@ JSON Format:
       mcq.explanation
     );
 
-    if (!allMCQsValid) {
-      return res.status(400).json({ error: '❌ One or more MCQs missing required fields' });
+    if (!allValid) {
+      return res.status(400).json({ error: '❌ One or more MCQs have missing fields' });
     }
 
-    // Insert into Supabase (merge logic)
     const { data, error } = await supabase
       .from('topic_uploads')
-      .upsert(
-        [{ topic_id, content: { steps: [parsed] } }],
-        { onConflict: ['topic_id'] }
-      );
+      .upsert([{ topic_id, content: { steps: [parsed] } }], { onConflict: ['topic_id'] });
 
     if (error) {
-      console.error('❌ Supabase insert error:', error);
+      console.error('❌ Supabase error:', error);
       return res.status(500).json({ error: error.message });
     }
 
     res.status(200).json({ message: '✅ Step 5 content saved successfully', data });
   } catch (err) {
-    console.error('❌ Step 5 GPT error:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('❌ GPT Step 5 error:', err.message);
+    res.status(500).json({ error: 'Failed to generate Step 5 content' });
   }
 };
 
@@ -1600,7 +1575,7 @@ JSON Format:
  *     summary: Generate Step 6 Media Library using GPT
  *     description: >
  *       Generates 10 high-yield videos and 10 high-yield images for a topic's Media Library (Step 6),
- *       including keywords and descriptions for each. Stores the result in Supabase under `topic_uploads`.
+ *       including keywords and descriptions. Stores result in Supabase under `topic_uploads`.
  *     requestBody:
  *       required: true
  *       content:
@@ -1620,14 +1595,6 @@ JSON Format:
  *     responses:
  *       200:
  *         description: Step 6 content successfully generated and saved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: ✅ Step 6 content saved successfully
  *       400:
  *         description: Missing input or validation failed
  *       500:
@@ -1643,107 +1610,78 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 module.exports = async (req, res) => {
   const { topic_id, topic_title } = req.body;
-
   if (!topic_id || !topic_title) {
     return res.status(400).json({ error: 'Missing topic_id or topic_title' });
   }
 
-  const prompt = `Only output valid JSON. No markdown, headings, comments, or HTML.
+  const prompt = `Only output valid JSON. No markdown or comments.
 
-You are an expert medical educator who creates high-yield, exam-focused content for USMLE, NBME, AMBOSS, and UWorld.
+You are an expert USMLE educator.
 
 Topic: ${topic_title}
 
-Your task:
-1. Create 10 YouTube-style video search entries with educational descriptions.
-2. Create 10 Google Images-style search entries with descriptions.
-3. Content should focus on anatomy origin, course, relations, branches, termination, and clinical relevance.
+Task:
+1. Create 10 YouTube-style video entries.
+2. Create 10 Google Images-style entries.
+3. Focus on anatomy, course, relations, branches, and clinical relevance.
 
-Strict JSON format:
+JSON format:
 {
   "step": 6,
   "content": [
     {
       "videos": [
-        {
-          "keyword": "...",
-          "description": "..."
-        }
-        // ... 10 total
+        { "keyword": "...", "description": "..." }
+        // 10 items
       ],
       "images": [
-        {
-          "keyword": "...",
-          "description": "..."
-        }
-        // ... 10 total
+        { "keyword": "...", "description": "..." }
+        // 10 items
       ]
     }
   ]
-}`;
+}
+`;
 
   try {
-    const chatCompletion = await openai.chat.completions.create({
+    const gptRes = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       temperature: 0.7,
       messages: [
-        {
-          role: 'system',
-          content: 'You are a strict medical content generator. Return only valid JSON. Format strictly.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'system', content: 'Return only valid JSON.' },
+        { role: 'user', content: prompt }
       ]
     });
 
-    const raw = chatCompletion.choices[0].message.content.trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '')
-      .replace(/\u200B/g, '');
+    const raw = gptRes.choices[0].message.content
+      .replace(/```json|```/g, '')
+      .replace(/\u200B/g, '')
+      .trim();
 
     let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch (err) {
-      console.error('❌ JSON Parse Error:', err.message);
       return res.status(500).json({ error: 'Invalid JSON from GPT' });
     }
 
-    // Validate structure
     if (
       parsed.step !== 6 ||
-      !Array.isArray(parsed.content) ||
-      parsed.content.length !== 1 ||
-      !Array.isArray(parsed.content[0].videos) ||
-      !Array.isArray(parsed.content[0].images) ||
-      parsed.content[0].videos.length !== 10 ||
-      parsed.content[0].images.length !== 10
+      !parsed.content?.[0]?.videos?.length === 10 ||
+      !parsed.content?.[0]?.images?.length === 10
     ) {
-      return res.status(400).json({ error: 'Invalid Step 6 format. Expected 10 videos and 10 images.' });
+      return res.status(400).json({ error: 'Invalid Step 6 format' });
     }
-
-    // Save to Supabase
-    const finalPayload = { steps: [parsed] };
 
     const { data, error } = await supabase
       .from('topic_uploads')
-      .upsert(
-        [{ topic_id, content: finalPayload }],
-        { onConflict: ['topic_id'] }
-      );
+      .upsert([{ topic_id, content: { steps: [parsed] } }], { onConflict: ['topic_id'] });
 
-    if (error) {
-      console.error('❌ Supabase Error:', error.message);
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) return res.status(500).json({ error: error.message });
 
     res.status(200).json({ message: '✅ Step 6 content saved successfully', data });
   } catch (err) {
-    console.error('❌ GPT Error:', err.message);
-    res.status(500).json({ error: 'Failed to generate Step 6 content' });
+    res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
 };
 
