@@ -1520,9 +1520,15 @@ Output format:
     const cleaned = gptResponse.choices[0].message.content
       .trim()
       .replace(/```json|```/g, '')
-      .replace(/\u200B/g, '');
+      .replace(/\u200B/g, '')
+      .replace(/\n/g, '');
 
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      return res.status(500).json({ error: '❌ JSON parse error from GPT output' });
+    }
 
     if (
       parsed.step !== 5 ||
@@ -1534,10 +1540,12 @@ Output format:
     }
 
     const allValid = parsed.content.mcqs.every(mcq =>
-      mcq.learning_gap && mcq.stem && mcq.options &&
-      ['A', 'B', 'C', 'D', 'E'].every(k => mcq.options[k]) &&
-      ['A', 'B', 'C', 'D', 'E'].includes(mcq.correct_answer) &&
-      mcq.explanation
+      typeof mcq.learning_gap === 'string' &&
+      typeof mcq.stem === 'string' &&
+      typeof mcq.explanation === 'string' &&
+      mcq.options && typeof mcq.options === 'object' &&
+      ['A', 'B', 'C', 'D', 'E'].every(k => typeof mcq.options[k] === 'string') &&
+      ['A', 'B', 'C', 'D', 'E'].includes(mcq.correct_answer)
     );
 
     if (!allValid) {
@@ -1552,6 +1560,7 @@ Output format:
 
     res.status(200).json({ message: '✅ Step 5 content saved successfully', data });
   } catch (err) {
+    console.error('❌ Step 5 GPT Error:', err);
     res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
 });
