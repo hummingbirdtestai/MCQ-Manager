@@ -189,10 +189,10 @@ paths:
               properties:
                 topic_id:
                   type: string
-                  example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
+                  example: "f6432bb2-282d-4411-aa6a-89dad335135f"
                 topic_title:
                   type: string
-                  example: "Demonstrate normal anatomical position, various planes, relation, comparison, laterality & movement in our body"
+                  example: "Explain function of meta-arterioles, precapillary sphincters, arterio-venous anastomoses"
       responses:
         '200':
           description: Step 5 MCQs successfully generated and stored
@@ -203,11 +203,11 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: ✅ Step 5 MCQs generated and stored
+                    example: ✅ Step 5 content saved successfully
                   data:
                     type: object
         '400':
-          description: Missing topic_id or topic_title
+          description: Missing or invalid Step 5 MCQ structure
           content:
             application/json:
               schema:
@@ -215,7 +215,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: topic_id and topic_title are required
+                    example: Invalid Step 5 structure or count mismatch
         '500':
           description: GPT generation or Supabase error
           content:
@@ -225,7 +225,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: GPT generation failed
+                    example: GPT Error: Failed to generate Step 5 content
 
   /generate-topic-step6:
     post:
