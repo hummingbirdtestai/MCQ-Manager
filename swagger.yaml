@@ -229,7 +229,8 @@ paths:
 
   /generate-topic-step6:
     post:
-      tags: [AI Content]
+      tags:
+        - AI Content
       summary: Generate Step 6 Media Library using GPT
       description: >
         Generates 10 high-yield videos and 10 high-yield images for a topic's Media Library (Step 6),
