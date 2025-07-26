@@ -117,9 +117,10 @@ paths:
 
   /generate-topic-step4:
     post:
-      tags: [AI Content]
+      tags:
+        - AI Content
       summary: Generate Step 4 clinical reasoning chat using GPT
-      description: Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload to Supabase.
+      description: Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload it to Supabase.
       requestBody:
         required: true
         content:
