@@ -1360,20 +1360,41 @@ app.post('/generate-topic-step4', async (req, res) => {
     }
 
     const prompt = `
-You are an expert USMLE medical educator and structured data content developer.
-Your mission is to create high-yield, clinically precise content tailored to prepare medical students at the level of AMBOSS / UWorld / NBME standards.
+Generate 5 high-standard clinical reasoning cases for medical education, specifically tailored for USMLE / NBME / AMBOSS quality.
+Strict output in JSON format for use in apps (React, Next.js, TypeScript) — directly copy-paste ready.
 
-🎯 OBJECTIVE:
-Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
+🧑‍⚕️ PROMPT TO USE WITH CHATGPT / GPT-4
+You are a senior USMLE educator and an expert in writing clinical reasoning cases for Step 1, Step 2 CK, and Step 3 exam prep (similar to AMBOSS, NBME, UWorld standard).
 
-🔷 TOPIC:
-<<TOPIC_TITLE>>
+Your task:
+Generate JSON content for a clinical reasoning chat simulation between a 👨‍🏫 teacher and 🧑‍🎓 student.
+The topic is:
+<<Describe composition of bone and bone marrow>>
+
+🔍 OUTPUT RULES (STRICT):
+Return ONLY VALID JSON. No explanations. No markdown. No comments. No headings.
+📐 JSON STRUCTURE PER CASE:
+Total: 5 Cases
+Each Case = 10 messages alternating Teacher / Student
+Total: 50 messages in strict order.
+
+🔢 STRUCTURE WITHIN EACH CASE:
+1️⃣ Teacher starts with:
+📁 Case X: [USMLE-level vignette (8 sentences minimum)]
+History, examination, labs, imaging — tough-level detail.
+2️⃣ Teacher asks 5 questions total per case. (Clinical reasoning, anatomy, pathophysiology)
+3️⃣ Student answers 5 answers total per case. (Correct, precise, USMLE standard)
+
+💡 STYLE GUIDE (INSIDE "html"):
+✅ Keywords highlighted with <strong>...</strong>
+✅ Emojis allowed: 🧠 💉 ⚠️ 🧪 ✅ 🩺 🔍
+✅ Breaks allowed: <br>
 
 🔷 CONTENT CREATION RULES:
 ✅ Output must be a valid JSON object starting with { and ending with }
 ✅ Do not include HTML, markdown, comments or explanation
 ✅ Each clinical case should have exactly 10 teacher–student chat messages
-✅ Return 10 total cases
+✅ Return 5 total cases
 ✅ Each message is a JSON object with sender ("teacher" or "student") and html message content
 ✅ Final output format:
 
