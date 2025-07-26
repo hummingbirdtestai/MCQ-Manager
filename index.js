@@ -1336,6 +1336,7 @@ app.post('/generate-topic-content', async (req, res) => {
  *   post:
  *     tags: [AI Content]
  *     summary: Generate Step 4 clinical reasoning chat using GPT
+ *     description: Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload to Supabase.
  *     requestBody:
  *       required: true
  *       content:
@@ -1348,16 +1349,45 @@ app.post('/generate-topic-content', async (req, res) => {
  *             properties:
  *               topic_id:
  *                 type: string
+ *                 example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
  *               topic_title:
  *                 type: string
+ *                 example: "Describe composition of bone and bone marrow"
  *     responses:
- *       200:
+ *       '200':
  *         description: Step 4 content successfully generated and saved
- *       400:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "\u2705 Step 4 content saved successfully"
+ *                 data:
+ *                   type: object
+ *       '400':
  *         description: Missing topic_id or topic_title
- *       500:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Missing topic_id or topic_title"
+ *       '500':
  *         description: GPT generation or Supabase error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "GPT returned invalid JSON"
  */
+
 app.post('/generate-topic-step4', async (req, res) => {
   try {
     const { topic_id, topic_title } = req.body;
@@ -1370,13 +1400,13 @@ app.post('/generate-topic-step4', async (req, res) => {
 You are a senior USMLE educator and an expert in writing clinical reasoning cases for Step 1, Step 2 CK, and Step 3 exam prep (similar to AMBOSS, NBME, UWorld standard).
 
 Your task:
-Generate JSON content for a clinical reasoning chat simulation between a 👨‍🏫 teacher and 🧑‍🎓 student.
+Generate JSON content for a clinical reasoning chat simulation between a 👩‍🏫 teacher and 🧑‍🎓 student.
 The topic is:
 ${topic_title}
 
 🔍 OUTPUT RULES (STRICT):
 Return ONLY VALID JSON. No explanations. No markdown. No comments. No headings.
-📐 JSON STRUCTURE PER CASE:
+🖐️ JSON STRUCTURE PER CASE:
 Total: 5 Cases
 Each Case = 10 messages alternating Teacher / Student
 Total: 50 messages in strict order.
@@ -1390,10 +1420,10 @@ History, examination, labs, imaging — tough-level detail.
 
 💡 STYLE GUIDE (INSIDE "html"):
 ✅ Keywords highlighted with <strong>...</strong>
-✅ Emojis allowed: 🧠 💉 ⚠️ 🧪 ✅ 🩺 🔍
+✅ Emojis allowed: 🧠 🧰 ⚠️ 🧪 ✅ 🩺 🔍
 ✅ Breaks allowed: <br>
 
-🔷 CONTENT CREATION RULES:
+🔶 CONTENT CREATION RULES:
 ✅ Output must be a valid JSON object starting with { and ending with }
 ✅ Each clinical case should have exactly 10 teacher–student chat messages
 ✅ Return 5 total cases
@@ -1412,8 +1442,7 @@ History, examination, labs, imaging — tough-level detail.
     },
     ...
   ]
-}
-    `.trim();
+}`.trim();
 
     const gptResponse = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -1431,7 +1460,12 @@ History, examination, labs, imaging — tough-level detail.
       contentJSON = JSON.parse(rawOutput);
     } catch (jsonErr) {
       console.error('❌ JSON Parse Error:', jsonErr);
-      throw new Error('GPT returned invalid JSON');
+      return res.status(500).json({ error: 'GPT returned invalid JSON' });
+    }
+
+    const allMessages = contentJSON?.content?.flatMap(c => c.chat);
+    if (!allMessages || allMessages.length !== 50) {
+      return res.status(400).json({ error: '❌ GPT failed to return valid Step 4 JSON with 50 messages' });
     }
 
     const { data, error } = await supabase
