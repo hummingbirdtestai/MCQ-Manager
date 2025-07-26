@@ -1334,6 +1334,7 @@ app.post('/generate-topic-content', async (req, res) => {
  * @swagger
  * /generate-topic-step4:
  *   post:
+ *     tags: [AI Content]
  *     summary: Generate Step 4 clinical reasoning chat using GPT
  *     requestBody:
  *       required: true
@@ -1341,6 +1342,9 @@ app.post('/generate-topic-content', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - topic_id
+ *               - topic_title
  *             properties:
  *               topic_id:
  *                 type: string
@@ -1349,8 +1353,11 @@ app.post('/generate-topic-content', async (req, res) => {
  *     responses:
  *       200:
  *         description: Step 4 content successfully generated and saved
+ *       400:
+ *         description: Missing topic_id or topic_title
+ *       500:
+ *         description: GPT generation or Supabase error
  */
-
 app.post('/generate-topic-step4', async (req, res) => {
   try {
     const { topic_id, topic_title } = req.body;
@@ -1360,16 +1367,12 @@ app.post('/generate-topic-step4', async (req, res) => {
     }
 
     const prompt = `
-Generate 5 high-standard clinical reasoning cases for medical education, specifically tailored for USMLE / NBME / AMBOSS quality.
-Strict output in JSON format for use in apps (React, Next.js, TypeScript) — directly copy-paste ready.
-
-🧑‍⚕️ PROMPT TO USE WITH CHATGPT / GPT-4
 You are a senior USMLE educator and an expert in writing clinical reasoning cases for Step 1, Step 2 CK, and Step 3 exam prep (similar to AMBOSS, NBME, UWorld standard).
 
 Your task:
 Generate JSON content for a clinical reasoning chat simulation between a 👨‍🏫 teacher and 🧑‍🎓 student.
 The topic is:
-<<Describe composition of bone and bone marrow>>
+${topic_title}
 
 🔍 OUTPUT RULES (STRICT):
 Return ONLY VALID JSON. No explanations. No markdown. No comments. No headings.
@@ -1392,7 +1395,6 @@ History, examination, labs, imaging — tough-level detail.
 
 🔷 CONTENT CREATION RULES:
 ✅ Output must be a valid JSON object starting with { and ending with }
-✅ Do not include HTML, markdown, comments or explanation
 ✅ Each clinical case should have exactly 10 teacher–student chat messages
 ✅ Return 5 total cases
 ✅ Each message is a JSON object with sender ("teacher" or "student") and html message content
@@ -1405,14 +1407,13 @@ History, examination, labs, imaging — tough-level detail.
       "case": 1,
       "chat": [
         { "sender": "teacher", "html": "..." },
-        { "sender": "student", "html": "..." },
-        ...
+        { "sender": "student", "html": "..." }
       ]
     },
     ...
   ]
 }
-    `.replace('<<TOPIC_TITLE>>', topic_title);
+    `.trim();
 
     const gptResponse = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -1420,7 +1421,18 @@ History, examination, labs, imaging — tough-level detail.
       temperature: 0.7
     });
 
-    const contentJSON = JSON.parse(gptResponse.choices[0].message.content);
+    const rawOutput = gptResponse.choices[0]?.message?.content;
+    if (!rawOutput) {
+      throw new Error('GPT response was empty');
+    }
+
+    let contentJSON;
+    try {
+      contentJSON = JSON.parse(rawOutput);
+    } catch (jsonErr) {
+      console.error('❌ JSON Parse Error:', jsonErr);
+      throw new Error('GPT returned invalid JSON');
+    }
 
     const { data, error } = await supabase
       .from('topic_uploads')
@@ -1437,6 +1449,7 @@ History, examination, labs, imaging — tough-level detail.
     }
 
     res.status(200).json({ message: '✅ Step 4 content saved successfully', data });
+
   } catch (err) {
     console.error('❌ Step 4 GPT error:', err);
     res.status(500).json({ error: err.message });
