@@ -225,7 +225,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: GPT Error: Failed to generate Step 5 content
+                    example: "GPT Error: Failed to generate Step 5 content"
 
   /generate-topic-step6:
     post:
