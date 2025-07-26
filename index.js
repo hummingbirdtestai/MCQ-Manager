@@ -1454,36 +1454,29 @@ Generate structured JSON content for Step 4 Clinical Reasoning Scenarios.
  *         description: GPT or Supabase error
  */
 
-require('dotenv').config();
-const { OpenAI } = require('openai');
-const { createClient } = require('@supabase/supabase-js');
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-const handleGenerateStep5 = async (req, res) => {
+app.post('/generate-topic-step5', async (req, res) => {
   const { topic_id, topic_title } = req.body;
+
   if (!topic_id || !topic_title) {
     return res.status(400).json({ error: 'Missing topic_id or topic_title' });
   }
 
   const prompt = `
-Only output valid JSON. Do not use markdown, headings, or commentary. Do not wrap JSON in \`\`\`json.
+Only output valid JSON. Do not use markdown or comments.
 
-You are expert USMLE Step 1 and Step 2 coaching mentor.
+You are expert USMLE Step 1/2 educator.
 
 Topic: ${topic_title}
 
-Your mission:
-1. Identify 10 learning gaps that may hinder understanding of this topic.
-2. For each learning gap, generate 1 USMLE-style clinical vignette MCQ.
-3. Each MCQ must include:
-   - A 5–6 line clinical vignette stem
-   - 5 realistic options labeled A to E
-   - Correct answer key (A–E)
-   - A 10-sentence NBME/AMBOSS-style explanation (why correct is right + why others are wrong)
+Instructions:
+1. Identify 10 learning gaps for this topic.
+2. For each, create:
+  - 1 USMLE-style clinical vignette MCQ (6-line stem)
+  - 5 answer options (A–E)
+  - Correct answer key (A–E)
+  - 10-sentence NBME-style explanation
 
-JSON Format:
+Output format:
 {
   "step": 5,
   "content": {
@@ -1515,19 +1508,21 @@ JSON Format:
       messages: [
         {
           role: 'system',
-          content: 'You are an expert USMLE content developer. Follow the instructions strictly and output only valid JSON.'
+          content: 'Return only valid JSON without markdown.'
         },
-        { role: 'user', content: prompt }
+        {
+          role: 'user',
+          content: prompt
+        }
       ]
     });
 
-    const rawOutput = gptResponse.choices[0].message.content
+    const cleaned = gptResponse.choices[0].message.content
       .trim()
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
+      .replace(/```json|```/g, '')
       .replace(/\u200B/g, '');
 
-    const parsed = JSON.parse(rawOutput);
+    const parsed = JSON.parse(cleaned);
 
     if (
       parsed.step !== 5 ||
@@ -1535,37 +1530,31 @@ JSON Format:
       !Array.isArray(parsed.content.mcqs) ||
       parsed.content.mcqs.length !== 10
     ) {
-      return res.status(400).json({ error: '❌ GPT did not return valid Step 5 format with 10 MCQs' });
+      return res.status(400).json({ error: 'Invalid Step 5 structure or count mismatch' });
     }
 
     const allValid = parsed.content.mcqs.every(mcq =>
-      mcq.learning_gap &&
-      mcq.stem &&
-      mcq.options && typeof mcq.options === 'object' &&
-      ['A', 'B', 'C', 'D', 'E'].every(k => typeof mcq.options[k] === 'string') &&
+      mcq.learning_gap && mcq.stem && mcq.options &&
+      ['A', 'B', 'C', 'D', 'E'].every(k => mcq.options[k]) &&
       ['A', 'B', 'C', 'D', 'E'].includes(mcq.correct_answer) &&
       mcq.explanation
     );
 
     if (!allValid) {
-      return res.status(400).json({ error: '❌ One or more MCQs have missing fields' });
+      return res.status(400).json({ error: 'One or more MCQs are missing required fields' });
     }
 
     const { data, error } = await supabase
       .from('topic_uploads')
       .upsert([{ topic_id, content: { steps: [parsed] } }], { onConflict: ['topic_id'] });
 
-    if (error) {
-      console.error('❌ Supabase error:', error);
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) return res.status(500).json({ error: error.message });
 
     res.status(200).json({ message: '✅ Step 5 content saved successfully', data });
   } catch (err) {
-    console.error('❌ GPT Step 5 error:', err.message);
-    res.status(500).json({ error: 'Failed to generate Step 5 content' });
+    res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
-};
+});
 
 /**
  * @swagger
@@ -1601,20 +1590,15 @@ JSON Format:
  *         description: GPT or Supabase error
  */
 
-const { OpenAI } = require('openai');
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-module.exports = async (req, res) => {
+app.post('/generate-topic-step6', async (req, res) => {
   const { topic_id, topic_title } = req.body;
+
   if (!topic_id || !topic_title) {
     return res.status(400).json({ error: 'Missing topic_id or topic_title' });
   }
 
-  const prompt = `Only output valid JSON. No markdown or comments.
+  const prompt = `
+Only output valid JSON. Do not use markdown or comments.
 
 You are an expert USMLE educator.
 
@@ -1667,10 +1651,12 @@ JSON format:
 
     if (
       parsed.step !== 6 ||
-      !parsed.content?.[0]?.videos?.length === 10 ||
-      !parsed.content?.[0]?.images?.length === 10
+      !Array.isArray(parsed.content) ||
+      parsed.content.length !== 1 ||
+      parsed.content[0].videos.length !== 10 ||
+      parsed.content[0].images.length !== 10
     ) {
-      return res.status(400).json({ error: 'Invalid Step 6 format' });
+      return res.status(400).json({ error: 'Invalid Step 6 structure or count mismatch' });
     }
 
     const { data, error } = await supabase
@@ -1683,7 +1669,7 @@ JSON format:
   } catch (err) {
     res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
-};
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
