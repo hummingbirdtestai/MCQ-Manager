@@ -1363,7 +1363,7 @@ app.post('/generate-topic-content', async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "\u2705 Step 4 content saved successfully"
+ *                   example: "✅ Step 4 content saved successfully"
  *                 data:
  *                   type: object
  *       '400':
@@ -1444,28 +1444,59 @@ History, examination, labs, imaging — tough-level detail.
   ]
 }`.trim();
 
-    const gptResponse = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7
-    });
+    let attempts = 0;
+    let contentJSON = null;
 
-    const rawOutput = gptResponse.choices[0]?.message?.content;
-    if (!rawOutput) {
-      throw new Error('GPT response was empty');
+    while (attempts < 3) {
+      const gptResponse = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7
+      });
+
+      const rawOutput = gptResponse.choices[0]?.message?.content;
+      console.log(`🔁 GPT Attempt ${attempts + 1}:\n`, rawOutput);
+
+      if (!rawOutput) {
+        attempts++;
+        continue;
+      }
+
+      try {
+        // Strip markdown ```json ``` if present
+        const cleaned = rawOutput.replace(/^```json|```$/g, '').trim();
+        contentJSON = JSON.parse(cleaned);
+
+        const allCases = contentJSON?.content;
+        if (!Array.isArray(allCases) || allCases.length !== 5) {
+          throw new Error('Invalid case count');
+        }
+
+        const allMessages = allCases.flatMap(c => c.chat);
+        if (allMessages.length !== 50) {
+          throw new Error('Invalid total messages');
+        }
+
+        // Each case should have exactly 10 messages
+        for (let i = 0; i < 5; i++) {
+          if (!Array.isArray(allCases[i].chat) || allCases[i].chat.length !== 10) {
+            throw new Error(`Case ${i + 1} must have 10 messages`);
+          }
+        }
+
+        // ✅ If all validations pass, break retry loop
+        break;
+      } catch (err) {
+        console.warn(`⚠️ Attempt ${attempts + 1} failed: ${err.message}`);
+        contentJSON = null;
+        attempts++;
+      }
     }
 
-    let contentJSON;
-    try {
-      contentJSON = JSON.parse(rawOutput);
-    } catch (jsonErr) {
-      console.error('❌ JSON Parse Error:', jsonErr);
-      return res.status(500).json({ error: 'GPT returned invalid JSON' });
-    }
-
-    const allMessages = contentJSON?.content?.flatMap(c => c.chat);
-    if (!allMessages || allMessages.length !== 50) {
-      return res.status(400).json({ error: '❌ GPT failed to return valid Step 4 JSON with 50 messages' });
+    if (!contentJSON) {
+      return res.status(400).json({
+        error: '❌ GPT failed to return valid Step 4 JSON with 50 messages after 3 attempts',
+      });
     }
 
     const { data, error } = await supabase
