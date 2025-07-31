@@ -44,6 +44,8 @@ async function extractAndInsertMCQsFromStep4(step4Content, topicId) {
     } else {
       console.log(`✅ Inserted ${mcqsToInsert.length} MCQs from Step 4`);
     }
+  } else {
+    console.log('ℹ️ No MCQs found to insert from Step 4');
   }
 }
 
@@ -96,7 +98,7 @@ Only return valid JSON.
         success = true;
         break;
       } catch (jsonError) {
-        console.warn(`⚠️ Attempt ${attempt} failed to parse JSON`);
+        console.warn(`⚠️ Attempt ${attempt} failed to parse JSON:`, jsonError.message);
         await delay(1000);
       }
     } catch (err) {
