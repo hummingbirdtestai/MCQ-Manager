@@ -1474,7 +1474,7 @@ History, examination, labs, imaging — tough-level detail.
 
         const allMessages = allCases.flatMap(c => c.chat);
         if (allMessages.length !== 50) {
-          throw new Error('Invalid total messages');
+          throw new Error('❌ GPT failed to return valid Step 4 JSON with 50 messages');
         }
 
         // Each case should have exactly 10 messages
