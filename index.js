@@ -1330,64 +1330,6 @@ app.post('/generate-topic-content', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /generate-topic-step4:
- *   post:
- *     tags: [AI Content]
- *     summary: Generate Step 4 clinical reasoning chat using GPT
- *     description: Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload to Supabase.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - topic_id
- *               - topic_title
- *             properties:
- *               topic_id:
- *                 type: string
- *                 example: "f9aa24b4-94c4-11ee-8c99-0242ac120002"
- *               topic_title:
- *                 type: string
- *                 example: "Describe composition of bone and bone marrow"
- *     responses:
- *       '200':
- *         description: Step 4 content successfully generated and saved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "✅ Step 4 content saved successfully"
- *                 data:
- *                   type: object
- *       '400':
- *         description: Missing topic_id or topic_title
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Missing topic_id or topic_title"
- *       '500':
- *         description: GPT generation or Supabase error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "GPT returned invalid JSON"
- */
-
 app.post('/generate-topic-step4', async (req, res) => {
   try {
     const { topic_id, topic_title } = req.body;
@@ -1454,7 +1396,7 @@ History, examination, labs, imaging — tough-level detail.
         temperature: 0.7
       });
 
-      const rawOutput = gptResponse.choices[0]?.message?.content;
+      const rawOutput = gptResponse.choices?.[0]?.message?.content;
       console.log(`🔁 GPT Attempt ${attempts + 1}:\n`, rawOutput);
 
       if (!rawOutput) {
@@ -1463,7 +1405,6 @@ History, examination, labs, imaging — tough-level detail.
       }
 
       try {
-        // Strip markdown ```json ``` if present
         const cleaned = rawOutput.replace(/^```json|```$/g, '').trim();
         contentJSON = JSON.parse(cleaned);
 
@@ -1477,14 +1418,12 @@ History, examination, labs, imaging — tough-level detail.
           throw new Error('❌ GPT failed to return valid Step 4 JSON with 50 messages');
         }
 
-        // Each case should have exactly 10 messages
         for (let i = 0; i < 5; i++) {
           if (!Array.isArray(allCases[i].chat) || allCases[i].chat.length !== 10) {
             throw new Error(`Case ${i + 1} must have 10 messages`);
           }
         }
 
-        // ✅ If all validations pass, break retry loop
         break;
       } catch (err) {
         console.warn(`⚠️ Attempt ${attempts + 1} failed: ${err.message}`);
@@ -1499,6 +1438,7 @@ History, examination, labs, imaging — tough-level detail.
       });
     }
 
+    // 🔁 UPSERT INTO topic_uploads
     const { data, error } = await supabase
       .from('topic_uploads')
       .upsert([
@@ -1513,7 +1453,50 @@ History, examination, labs, imaging — tough-level detail.
       return res.status(500).json({ error: error.message });
     }
 
-    res.status(200).json({ message: '✅ Step 4 content saved successfully', data });
+    // 🔁 Extract MCQs from chat messages
+    const extractedMcqs = [];
+
+    contentJSON.content.forEach((caseItem, caseIndex) => {
+      const chat = caseItem.chat;
+
+      for (let i = 0; i < chat.length; i++) {
+        const msg = chat[i];
+        const next = chat[i + 1];
+
+        if (
+          msg?.sender === 'teacher' &&
+          msg.html.includes('?') &&
+          next?.sender === 'student'
+        ) {
+          extractedMcqs.push({
+            topic_id,
+            stem: msg.html,
+            options: ['Option A', 'Option B', 'Option C', 'Option D', 'Option E'], // Placeholder
+            correct_answer: 'A', // Placeholder
+            explanation: next.html || 'Explanation not found',
+            source: 'step4_case'
+          });
+        }
+      }
+    });
+
+    // 🔁 Insert extracted MCQs into mcqs table
+    if (extractedMcqs.length) {
+      const { error: mcqError } = await supabase
+        .from('mcqs')
+        .insert(extractedMcqs);
+
+      if (mcqError) {
+        console.error('❌ Error inserting MCQs from Step 4:', mcqError);
+        return res.status(500).json({ error: 'MCQ insert failed' });
+      }
+    }
+
+    res.status(200).json({
+      message: '✅ Step 4 content saved successfully',
+      data,
+      inserted_mcqs: extractedMcqs.length
+    });
 
   } catch (err) {
     console.error('❌ Step 4 GPT error:', err);
