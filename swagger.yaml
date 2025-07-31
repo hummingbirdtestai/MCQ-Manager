@@ -122,8 +122,12 @@ paths:
       summary: Generate Step 4 clinical reasoning chat using GPT
       description: >
         Generate USMLE-style clinical reasoning chat (Step 4) for a given topic and upload it to Supabase.
-        Output must be exactly 5 cases, each with 10 alternating teacher-student messages (total 50 messages).
-        Fails if output is not strictly valid JSON or does not meet structure requirements.
+  
+        ✅ Output includes exactly 5 cases, each with 10 alternating teacher-student messages (total 50 messages).
+  
+        ✅ Automatically inserts any teacher-student message pairs that resemble MCQs into the `mcqs` table with placeholders.
+  
+        ❌ Fails if GPT output is not valid JSON or does not meet structure requirements.
       requestBody:
         required: true
         content:
@@ -142,7 +146,7 @@ paths:
                   example: "Describe composition of bone and bone marrow"
       responses:
         '200':
-          description: Step 4 content successfully generated and saved
+          description: Step 4 content and extracted MCQs successfully saved
           content:
             application/json:
               schema:
@@ -153,6 +157,9 @@ paths:
                     example: "✅ Step 4 content saved successfully"
                   data:
                     type: object
+                  inserted_mcqs:
+                    type: integer
+                    example: 8
         '400':
           description: Validation failed - missing input or structure invalid
           content:
@@ -172,7 +179,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: "GPT returned invalid JSON"
+                    example: "❌ Supabase insert error: column 'stem' is required"
 
   /generate-topic-step5:
     post:
