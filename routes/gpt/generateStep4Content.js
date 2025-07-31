@@ -1,5 +1,5 @@
 const { OpenAI } = require('openai');
-const { supabase } = require('../../config/supabaseClient');
+const { supabase } = require('../../utils/supabaseClient');
 const validateStep4Content = require('../validators/validateStep4Content');
 const { v4: uuidv4 } = require('uuid');
 
