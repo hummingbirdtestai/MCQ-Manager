@@ -16,7 +16,9 @@ tags:
     description: Authentication via Twilio OTP
   - name: AI Content
     description: GPT-Generated Step-wise Content
-
+  - name: Leaderboard
+    description: Leaderboard endpoints for each topic
+    
 # ⬇ Full paths block continues here
 paths:
   /auth/otp/start:
