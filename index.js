@@ -705,7 +705,7 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
  * /topics/{topicId}/leaderboard:
  *   get:
  *     tags:
- *       - Topics
+ *       - Leaderboard
  *     summary: Get leaderboard for a topic
  *     description: Returns the top 10 users with their name, college name, photograph, and total score for the given topic.
  *     parameters:
@@ -714,10 +714,11 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: UUID of the topic
  *     responses:
  *       200:
- *         description: Leaderboard for the topic
+ *         description: Leaderboard data fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -727,58 +728,75 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
  *                 properties:
  *                   name:
  *                     type: string
+ *                     example: "MANU BHARADWAJ"
  *                   photograph_url:
  *                     type: string
+ *                     example: "https://example.com/photo.jpg"
  *                   medical_college:
  *                     type: string
+ *                     example: "Government Medical College, Surat"
  *                   total_score:
- *                     type: number
+ *                     type: integer
+ *                     example: 12
+ *       404:
+ *         description: No leaderboard data found for the topic
+ *       500:
+ *         description: Internal server error
  */
 app.get('/topics/:topicId/leaderboard', async (req, res) => {
   const { topicId } = req.params;
 
-  const { data, error } = await supabase
-    .from('student_mcq_responses')
-    .select(`
-      user_id,
-      score,
-      users (
-        name,
-        photograph_url,
-        medical_college_id,
-        colleges (
-          name
+  try {
+    const { data, error } = await supabase
+      .from('student_mcq_responses')
+      .select(`
+        user_id,
+        score,
+        users (
+          name,
+          photograph_url,
+          medical_college_id,
+          colleges (
+            name
+          )
         )
-      )
-    `)
-    .eq('topic_id', topicId);
+      `)
+      .eq('topic_id', topicId);
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  const leaderboardMap = {};
-
-  data.forEach(({ user_id, score, users }) => {
-    const collegeName = users?.colleges?.name || 'Unknown';
-
-    if (!leaderboardMap[user_id]) {
-      leaderboardMap[user_id] = {
-        name: users.name,
-        photograph_url: users.photograph_url,
-        medical_college: collegeName,
-        total_score: 0,
-      };
+    if (error) {
+      return res.status(500).json({ error: error.message });
     }
 
-    leaderboardMap[user_id].total_score += score;
-  });
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: 'No leaderboard data found for this topic' });
+    }
 
-  const sorted = Object.values(leaderboardMap)
-    .sort((a, b) => b.total_score - a.total_score)
-    .slice(0, 10);
+    const leaderboardMap = {};
 
-  res.json(sorted);
+    data.forEach(({ user_id, score, users }) => {
+      const collegeName = users?.colleges?.name || 'Unknown';
+
+      if (!leaderboardMap[user_id]) {
+        leaderboardMap[user_id] = {
+          name: users.name,
+          photograph_url: users.photograph_url,
+          medical_college: collegeName,
+          total_score: 0,
+        };
+      }
+
+      leaderboardMap[user_id].total_score += score;
+    });
+
+    const sorted = Object.values(leaderboardMap)
+      .sort((a, b) => b.total_score - a.total_score)
+      .slice(0, 10);
+
+    res.status(200).json(sorted);
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 /**
