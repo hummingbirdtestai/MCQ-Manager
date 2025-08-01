@@ -699,6 +699,7 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
 
   res.status(200).json({ message: 'Answer submitted', score });
 });
+
 /**
  * @swagger
  * /topics/{topicId}/leaderboard:
@@ -718,31 +719,52 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
  */
 app.get('/topics/:topicId/leaderboard', async (req, res) => {
   const { topicId } = req.params;
-  const { data, error } = await supabase.from('student_mcq_responses').select(`
-    user_id,
-    users (
-      name,
-      photograph_url,
-      medical_college
-    ),
-    score
-  `).eq('topic_id', topicId);
-  if (error) return res.status(500).json({ error: error.message });
-  const leaderboard = {};
+
+  const { data, error } = await supabase
+    .from('student_mcq_responses')
+    .select(`
+      user_id,
+      score,
+      users (
+        name,
+        photograph_url,
+        medical_college_id,
+        colleges (
+          name
+        )
+      )
+    `)
+    .eq('topic_id', topicId);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  const leaderboardMap = {};
+
   data.forEach((row) => {
-    if (!leaderboard[row.user_id]) {
-      leaderboard[row.user_id] = {
-        name: row.users.name,
-        photograph_url: row.users.photograph_url,
-        medical_college: row.users.medical_college,
-        total_score: 0
+    const { user_id, score, users } = row;
+    const collegeName = users.colleges?.name || 'Unknown';
+
+    if (!leaderboardMap[user_id]) {
+      leaderboardMap[user_id] = {
+        name: users.name,
+        photograph_url: users.photograph_url,
+        medical_college: collegeName,
+        total_score: 0,
       };
     }
-    leaderboard[row.user_id].total_score += row.score;
+
+    leaderboardMap[user_id].total_score += score;
   });
-  const sorted = Object.values(leaderboard).sort((a, b) => b.total_score - a.total_score).slice(0, 10);
+
+  const sorted = Object.values(leaderboardMap)
+    .sort((a, b) => b.total_score - a.total_score)
+    .slice(0, 10);
+
   res.json(sorted);
 });
+
 /**
  * @swagger
  * /topics/{topicId}/mcqs/{mcqId}/leaderboard-status:
