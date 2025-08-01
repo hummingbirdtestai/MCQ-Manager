@@ -711,19 +711,20 @@ paths:
   /topics/{topicId}/leaderboard:
     get:
       tags:
-        - Topics
+        - Leaderboard
       summary: Get leaderboard for a topic
       description: Returns the top 10 users with their name, college name, photograph, and total score for the given topic.
       parameters:
-        - in: path
-          name: topicId
+        - name: topicId
+          in: path
           required: true
+          description: UUID of the topic
           schema:
             type: string
-          description: UUID of the topic
+            format: uuid
       responses:
         '200':
-          description: Leaderboard for the topic
+          description: Leaderboard data fetched successfully
           content:
             application/json:
               schema:
@@ -733,12 +734,20 @@ paths:
                   properties:
                     name:
                       type: string
+                      example: "MANU BHARADWAJ"
                     photograph_url:
                       type: string
+                      example: "https://example.com/photo.jpg"
                     medical_college:
                       type: string
+                      example: "Government Medical College, Surat"
                     total_score:
-                      type: number
+                      type: integer
+                      example: 5
+        '404':
+          description: No leaderboard data found for the topic
+        '500':
+          description: Internal server error
 
   /topics/{topicId}/mcqs/{mcqId}/leaderboard-status:
     get:
