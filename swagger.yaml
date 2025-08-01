@@ -739,3 +739,77 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: Leaderboard + user status }
+
+  /subjects/{subjectId}/full-structure:
+    get:
+      tags:
+        - Subjects
+      summary: Get full structure of a subject (chapters → topics → MCQ IDs)
+      description: >
+        Returns the entire hierarchy for a subject including all chapters, topics, and MCQ IDs (only IDs, no content).
+      parameters:
+        - in: path
+          name: subjectId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "e8f1b111-abc1-4c2d-a890-cdf89120e700"
+      responses:
+        '200':
+          description: Subject structure retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subject:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                  chapters:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        topics:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              name:
+                                type: string
+                              mcqs:
+                                type: array
+                                items:
+                                  type: string
+        '404':
+          description: Subject not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Subject not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to fetch full structure
+
