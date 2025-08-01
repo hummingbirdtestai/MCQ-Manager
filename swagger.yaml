@@ -710,15 +710,51 @@ paths:
 
   /topics/{topicId}/leaderboard:
     get:
-      tags: [Topics]
+      tags:
+        - Topics
       summary: Get leaderboard for a topic
+      description: Returns the top 10 users for a given topic based on cumulative score.
       parameters:
         - in: path
           name: topicId
           required: true
-          schema: { type: string }
+          schema:
+            type: string
+          description: UUID of the topic
       responses:
-        '200': { description: Leaderboard }
+        '200':
+          description: Leaderboard for the topic
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "John Doe"
+                    photograph_url:
+                      type: string
+                      format: uri
+                      example: "https://example.com/photo.jpg"
+                    medical_college:
+                      type: string
+                      example: "AIIMS Delhi"
+                    total_score:
+                      type: integer
+                      example: 42
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "column users.medical_college does not exist"
+
 
   /topics/{topicId}/mcqs/{mcqId}/leaderboard-status:
     get:
