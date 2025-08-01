@@ -743,7 +743,7 @@ paths:
                       example: "Government Medical College, Surat"
                     total_score:
                       type: integer
-                      example: 5
+                      example: 12
         '404':
           description: No leaderboard data found for the topic
         '500':
