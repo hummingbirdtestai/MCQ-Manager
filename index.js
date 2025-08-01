@@ -707,15 +707,32 @@ app.post('/topics/:topicId/mcqs/:mcqId/submit', async (req, res) => {
  *     tags:
  *       - Topics
  *     summary: Get leaderboard for a topic
+ *     description: Returns the top 10 users with their name, college name, photograph, and total score for the given topic.
  *     parameters:
  *       - in: path
  *         name: topicId
  *         required: true
  *         schema:
  *           type: string
+ *         description: UUID of the topic
  *     responses:
  *       200:
  *         description: Leaderboard for the topic
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   photograph_url:
+ *                     type: string
+ *                   medical_college:
+ *                     type: string
+ *                   total_score:
+ *                     type: number
  */
 app.get('/topics/:topicId/leaderboard', async (req, res) => {
   const { topicId } = req.params;
@@ -742,9 +759,8 @@ app.get('/topics/:topicId/leaderboard', async (req, res) => {
 
   const leaderboardMap = {};
 
-  data.forEach((row) => {
-    const { user_id, score, users } = row;
-    const collegeName = users.colleges?.name || 'Unknown';
+  data.forEach(({ user_id, score, users }) => {
+    const collegeName = users?.colleges?.name || 'Unknown';
 
     if (!leaderboardMap[user_id]) {
       leaderboardMap[user_id] = {
