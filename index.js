@@ -782,8 +782,15 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
       score,
       selected_answer,
       is_correct,
-      mcqs(correct_answer),
-      users(name, photograph_url, medical_college)
+      mcqs (correct_answer),
+      users (
+        name,
+        photograph_url,
+        medical_college_id,
+        colleges (
+          name
+        )
+      )
     `)
     .eq('topic_id', topicId);
 
@@ -795,11 +802,13 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
 
   const userScores = {};
   allResponses.forEach(r => {
+    const collegeName = r.users.colleges?.name || 'Unknown';
+
     if (!userScores[r.user_id]) {
       userScores[r.user_id] = {
         name: r.users.name,
         photo: r.users.photograph_url,
-        college: r.users.medical_college,
+        college: collegeName,
         total_score: 0,
         specific_mcq_score: 0,
         specific_answer: null,
@@ -807,9 +816,11 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
         specific_correctness: null
       };
     }
+
     if (mcqOrder.indexOf(r.mcq_id) <= uptoIndex) {
       userScores[r.user_id].total_score += r.score;
     }
+
     if (r.mcq_id === mcqId) {
       userScores[r.user_id].specific_mcq_score = r.score;
       userScores[r.user_id].specific_answer = r.selected_answer;
@@ -844,6 +855,8 @@ app.get('/topics/:topicId/mcqs/:mcqId/leaderboard-status', async (req, res) => {
   res.json({
     leaderboard: sorted.map(u => ({
       name: u.name,
+      photograph_url: u.photo,
+      medical_college: u.college,
       total_score: u.total_score,
       specific_mcq_score: u.specific_mcq_score,
       rank: u.rank
