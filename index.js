@@ -1761,6 +1761,84 @@ JSON format:
     res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
 });
+/**
+ * @swagger
+ * /subjects/{subjectId}/full-structure:
+ *   get:
+ *     tags:
+ *       - Subjects
+ *     summary: Get full structure of a subject (chapters, topics, MCQ IDs only)
+ *     parameters:
+ *       - in: path
+ *         name: subjectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Full subject structure including chapters, topics, and MCQ IDs
+ *       404:
+ *         description: Subject not found
+ *       500:
+ *         description: Server error
+ */
+app.get('/subjects/:subjectId/full-structure', async (req, res) => {
+  const { subjectId } = req.params;
+
+  try {
+    const { data: subject, error: subjectError } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('id', subjectId)
+      .single();
+
+    if (subjectError || !subject) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    const { data: chapters, error: chaptersError } = await supabase
+      .from('chapters')
+      .select('id, name')
+      .eq('subject_id', subjectId);
+
+    if (chaptersError) return res.status(500).json({ error: chaptersError.message });
+
+    const chaptersWithTopics = await Promise.all(chapters.map(async (chapter) => {
+      const { data: topics } = await supabase
+        .from('topics')
+        .select('id, name')
+        .eq('chapter_id', chapter.id);
+
+      const topicsWithMcqs = await Promise.all((topics || []).map(async (topic) => {
+        const { data: mcqs } = await supabase
+          .from('mcqs')
+          .select('id')
+          .eq('topic_id', topic.id);
+
+        return {
+          id: topic.id,
+          name: topic.name,
+          mcqs: (mcqs || []).map(m => m.id)
+        };
+      }));
+
+      return {
+        id: chapter.id,
+        name: chapter.name,
+        topics: topicsWithMcqs
+      };
+    }));
+
+    return res.status(200).json({
+      subject,
+      chapters: chaptersWithTopics
+    });
+
+  } catch (err) {
+    console.error('❌ Full structure fetch error:', err);
+    return res.status(500).json({ error: 'Failed to fetch full structure' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
