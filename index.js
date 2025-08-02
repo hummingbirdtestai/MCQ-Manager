@@ -1830,6 +1830,7 @@ JSON format:
     res.status(500).json({ error: 'GPT Error: ' + err.message });
   }
 });
+
 /**
  * @swagger
  * /subjects/{subjectId}/full-structure:
@@ -1907,6 +1908,108 @@ app.get('/subjects/:subjectId/full-structure', async (req, res) => {
     console.error('❌ Full structure fetch error:', err);
     return res.status(500).json({ error: 'Failed to fetch full structure' });
   }
+});
+
+/**
+ * @swagger
+ * /topics/{topicId}/progress:
+ *   get:
+ *     tags:
+ *       - Progress
+ *     summary: Get last MCQ progress for a user in a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: UUID of the topic
+ *       - in: query
+ *         name: user_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: UUID of the user
+ *     responses:
+ *       200:
+ *         description: Last MCQ ID returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 last_mcq_id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: No progress found
+ *       500:
+ *         description: Server error
+ */
+app.get('/topics/:topicId/progress', async (req, res) => {
+  const { topicId } = req.params;
+  const { user_id } = req.query;
+
+  const { data, error } = await supabase
+    .from('topic_mcq_progress')
+    .select('last_mcq_id')
+    .eq('user_id', user_id)
+    .eq('topic_id', topicId)
+    .single();
+
+  if (error) return res.status(404).json({ error: 'No progress found' });
+  res.status(200).json({ last_mcq_id: data.last_mcq_id });
+});
+
+
+/**
+ * @swagger
+ * /topics/{topicId}/progress/update:
+ *   post:
+ *     tags:
+ *       - Progress
+ *     summary: Update last MCQ progress for a user in a topic
+ *     parameters:
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: UUID of the topic
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_id
+ *               - last_mcq_id
+ *             properties:
+ *               user_id:
+ *                 type: string
+ *               last_mcq_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Progress updated successfully
+ *       500:
+ *         description: Failed to update progress
+ */
+app.post('/topics/:topicId/progress/update', async (req, res) => {
+  const { topicId } = req.params;
+  const { user_id, last_mcq_id } = req.body;
+
+  const { error } = await supabase
+    .from('topic_mcq_progress')
+    .upsert(
+      { user_id, topic_id: topicId, last_mcq_id },
+      { onConflict: ['user_id', 'topic_id'] }
+    );
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.status(200).json({ message: 'Progress updated successfully' });
 });
 
 const PORT = process.env.PORT || 3000;
