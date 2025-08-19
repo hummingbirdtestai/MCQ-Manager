@@ -82,13 +82,20 @@ app.post('/subjects', async (req, res) => {
  *   get:
  *     tags:
  *       - Subjects
- *     summary: Get all subjects
+ *     summary: Get all subjects along with chapters and topics
  *     responses:
  *       200:
- *         description: List of subjects
+ *         description: List of subjects with chapters and topics
  */
 app.get('/subjects', async (req, res) => {
-  const { data, error } = await supabase.from('subjects').select('id, name');
+  const { data, error } = await supabase
+    .from('subjects')
+    .select(`
+      id, 
+      name, 
+      chapters(id, name, topics(id, name))
+    `);
+
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
