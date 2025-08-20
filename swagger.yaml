@@ -505,45 +505,47 @@ paths:
         '201': { description: Subjects created }
 
     get:
-        tags:
-          - Subjects
-        summary: Get all subjects along with chapters and topics
-         responses:
-           200:
-             description: List of subjects with chapters and topics
-             schema:
-               type: array
-               items:
-                 type: object
-                 properties:
-                   id:
-                     type: integer
-                     description: ID of the subject
-                   name:
-                     type: string
-                     description: Name of the subject
-                   chapters:
-                     type: array
-                     items:
-                       type: object
-                       properties:
-                        id:
-                          type: integer
-                          description: ID of the chapter
-                        name:
-                          type: string
-                          description: Name of the chapter
-                         topics:
-                           type: array
-                           items:
-                             type: object
-                             properties:
-                               id:
-                                 type: integer
-                                 description: ID of the topic
-                               name:
-                                 type: string
-                                 description: Name of the topic
+      tags:
+        - Subjects
+      summary: Get all subjects along with chapters and topics
+      responses:
+        200:
+          description: List of subjects with chapters and topics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      description: ID of the subject
+                    name:
+                      type: string
+                      description: Name of the subject
+                    chapters:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            description: ID of the chapter
+                          name:
+                            type: string
+                            description: Name of the chapter
+                          topics:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                  description: ID of the topic
+                                name:
+                                  type: string
+                                  description: Name of the topic
 
   /subjects/{subjectId}/chapters:
     post:
